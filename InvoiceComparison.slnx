@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Core/">
+    <Project Path="src/Core/InvoiceComparison.Application/InvoiceComparison.Application.csproj" />
+    <Project Path="src/Core/InvoiceComparison.Domain/InvoiceComparison.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/Infrastructure/InvoiceComparison.Infrastructure/InvoiceComparison.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Presentation/">
+    <Project Path="src/Presentation/InvoiceComparison.Api/InvoiceComparison.Api.csproj" />
+  </Folder>
+</Solution>
