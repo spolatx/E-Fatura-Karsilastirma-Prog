@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using InvoiceComparison.Application.Interfaces;
 using InvoiceComparison.Infrastructure.Configuration;
 using InvoiceComparison.Infrastructure.ExternalServices;
@@ -24,31 +23,7 @@ public static class DependencyInjection
             configuration.GetSection(ELogoOptions.SectionName));
 
         services.AddScoped<ILogoDatabaseRepository, LogoDapperRepository>();
-
-        services.AddHttpClient<IELogoIntegrationService, ELogoIntegrationService>((serviceProvider, client) =>
-        {
-            var eLogoOptions = configuration
-                .GetSection(ELogoOptions.SectionName)
-                .Get<ELogoOptions>() ?? new ELogoOptions();
-
-            if (!string.IsNullOrWhiteSpace(eLogoOptions.BaseUrl))
-            {
-                client.BaseAddress = new Uri(eLogoOptions.BaseUrl.TrimEnd('/'));
-            }
-
-            client.Timeout = TimeSpan.FromSeconds(
-                eLogoOptions.TimeoutSeconds > 0 ? eLogoOptions.TimeoutSeconds : 90);
-
-            client.DefaultRequestHeaders.Accept.Clear();
-            client.DefaultRequestHeaders.Accept.Add(
-                new MediaTypeWithQualityHeaderValue("application/json"));
-
-            if (!string.IsNullOrWhiteSpace(eLogoOptions.ApiKey))
-            {
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", eLogoOptions.ApiKey);
-            }
-        });
+        services.AddScoped<IELogoIntegrationService, ELogoIntegrationService>();
 
         return services;
     }

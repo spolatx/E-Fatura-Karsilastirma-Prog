@@ -1,0 +1,54 @@
+{
+  "providerId": "Microsoft.Tools.ServiceModel.Svcutil",
+  "version": "8.0.0",
+  "options": {
+    "inputs": [
+      "https://pb.elogo.com.tr/PostBoxService.svc?wsdl"
+    ],
+    "namespaceMappings": [
+      "*, InvoiceComparison.Infrastructure.ELogoServiceReference"
+    ],
+    "outputFile": "Reference.cs",
+    "references": [
+      "Azure.Core, {Azure.Core, 1.38.0}",
+      "Azure.Identity, {Azure.Identity, 1.11.4}",
+      "C:\\Users\\spola\\Desktop\\E-Fatura Karşılaştırma\\src\\Infrastructure\\InvoiceComparison.Infrastructure\\bin\\Debug\\net10.0\\InvoiceComparison.Application.dll",
+      "C:\\Users\\spola\\Desktop\\E-Fatura Karşılaştırma\\src\\Infrastructure\\InvoiceComparison.Infrastructure\\bin\\Debug\\net10.0\\InvoiceComparison.Domain.dll",
+      "Dapper, {Dapper, 2.1.66}",
+      "Microsoft.Bcl.AsyncInterfaces, {Microsoft.Bcl.AsyncInterfaces, 1.1.1}",
+      "Microsoft.Bcl.Cryptography, {Microsoft.Bcl.Cryptography, 9.0.4}",
+      "Microsoft.Data.SqlClient, {Microsoft.Data.SqlClient, 6.0.2}",
+      "Microsoft.Extensions.Configuration, {Microsoft.Extensions.Configuration, 10.0.0}",
+      "Microsoft.Extensions.Configuration.Abstractions, {Microsoft.Extensions.Configuration.Abstractions, 10.0.0}",
+      "Microsoft.Extensions.Configuration.Binder, {Microsoft.Extensions.Configuration.Binder, 10.0.0}",
+      "Microsoft.Extensions.DependencyInjection, {Microsoft.Extensions.DependencyInjection, 10.0.0}",
+      "Microsoft.Extensions.DependencyInjection.Abstractions, {Microsoft.Extensions.DependencyInjection.Abstractions, 10.0.0}",
+      "Microsoft.Extensions.Diagnostics, {Microsoft.Extensions.Diagnostics, 10.0.0}",
+      "Microsoft.Extensions.Diagnostics.Abstractions, {Microsoft.Extensions.Diagnostics.Abstractions, 10.0.0}",
+      "Microsoft.Extensions.Http, {Microsoft.Extensions.Http, 10.0.0}",
+      "Microsoft.Extensions.Logging, {Microsoft.Extensions.Logging, 10.0.0}",
+      "Microsoft.Extensions.Logging.Abstractions, {Microsoft.Extensions.Logging.Abstractions, 10.0.0}",
+      "Microsoft.Extensions.ObjectPool, {Microsoft.Extensions.ObjectPool, 10.0.13}",
+      "Microsoft.Extensions.Options, {Microsoft.Extensions.Options, 10.0.0}",
+      "Microsoft.Extensions.Options.ConfigurationExtensions, {Microsoft.Extensions.Options.ConfigurationExtensions, 10.0.0}",
+      "Microsoft.Extensions.Primitives, {Microsoft.Extensions.Primitives, 10.0.0}",
+      "Microsoft.Identity.Client, {Microsoft.Identity.Client, 4.61.3}",
+      "Microsoft.Identity.Client.Extensions.Msal, {Microsoft.Identity.Client.Extensions.Msal, 4.61.3}",
+      "Microsoft.IdentityModel.Abstractions, {Microsoft.IdentityModel.Abstractions, 7.5.0}",
+      "Microsoft.IdentityModel.JsonWebTokens, {Microsoft.IdentityModel.JsonWebTokens, 7.5.0}",
+      "Microsoft.IdentityModel.Logging, {Microsoft.IdentityModel.Logging, 7.5.0}",
+      "Microsoft.IdentityModel.Protocols, {Microsoft.IdentityModel.Protocols, 7.5.0}",
+      "Microsoft.IdentityModel.Protocols.OpenIdConnect, {Microsoft.IdentityModel.Protocols.OpenIdConnect, 7.5.0}",
+      "Microsoft.IdentityModel.Tokens, {Microsoft.IdentityModel.Tokens, 7.5.0}",
+      "Microsoft.SqlServer.Server, {Microsoft.SqlServer.Server, 1.0.0}",
+      "System.ClientModel, {System.ClientModel, 1.0.0}",
+      "System.IdentityModel.Tokens.Jwt, {System.IdentityModel.Tokens.Jwt, 7.5.0}",
+      "System.Memory.Data, {System.Memory.Data, 1.0.2}",
+      "System.Security.Cryptography.Pkcs, {System.Security.Cryptography.Pkcs, 10.0.13}",
+      "System.Security.Cryptography.ProtectedData, {System.Security.Cryptography.ProtectedData, 9.0.4}",
+      "System.Security.Cryptography.Xml, {System.Security.Cryptography.Xml, 10.0.13}"
+    ],
+    "targetFramework": "net10.0",
+    "typeReuseMode": "All"
+  }
+}

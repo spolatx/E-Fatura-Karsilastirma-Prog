@@ -50,3 +50,4 @@ npm install
 npm run dev
 ```
 *Arayüz `http://localhost:3000` adresinde açılır.*
+
