@@ -47,7 +47,7 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
         var stficheTableName = $"LG_{_options.FirmNumber}_{_options.PeriodNumber}_STFICHE";
         var invoiceTableName = $"LG_{_options.FirmNumber}_{_options.PeriodNumber}_INVOICE";
 
-        // Queries ETTN values from both LG_XXX_XX_STFICHE (TRACKNR) and LG_XXX_XX_INVOICE (TRACKNR / GUID)
+        // Queries ETTN values from both LG_XXX_XX_STFICHE (TRACKNR) and LG_XXX_XX_INVOICE (TRACKNR)
         // using WITH (NOLOCK) so active Logo ERP transactions are never blocked.
         var sql = $"""
             SELECT DISTINCT
@@ -62,15 +62,13 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
             UNION
 
             SELECT DISTINCT
-                LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(INV.[TRACKNR])), ''), NULLIF(LTRIM(RTRIM(INV.[GUID])), '')))) AS Ettn
+                LTRIM(RTRIM(INV.[TRACKNR])) AS Ettn
             FROM [{invoiceTableName}] AS INV WITH (NOLOCK)
             WHERE INV.[CANCELLED] = 0
               AND INV.[DATE_] >= @StartDate
               AND INV.[DATE_] <= @EndDate
-              AND (
-                  (INV.[TRACKNR] IS NOT NULL AND LEN(LTRIM(RTRIM(INV.[TRACKNR]))) >= 32)
-                  OR (INV.[GUID] IS NOT NULL AND LEN(LTRIM(RTRIM(INV.[GUID]))) >= 32)
-              );
+              AND INV.[TRACKNR] IS NOT NULL
+              AND LEN(LTRIM(RTRIM(INV.[TRACKNR]))) >= 32;
             """;
 
         try

@@ -5,7 +5,7 @@ import {
 } from '@/types/invoice';
 
 const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+  process.env.NEXT_PUBLIC_API_URL || ''
 ).replace(/\/$/, '');
 
 export async function fetchMissingInvoices(
@@ -90,4 +90,3 @@ export async function markInvoiceAsUnread(
 
   return response.json();
 }
-

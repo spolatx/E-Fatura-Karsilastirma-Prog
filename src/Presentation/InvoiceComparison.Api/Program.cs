@@ -53,7 +53,14 @@ var app = builder.Build();
 app.UseExceptionHandler();
 app.UseCors(FrontendCorsPolicy);
 
+// Serve static frontend files from wwwroot
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // Map Minimal API Route Group (/api/invoices)
 app.MapInvoiceEndpoints();
+
+// SPA Fallback: route any unknown client paths to index.html
+app.MapFallbackToFile("index.html");
 
 app.Run();
