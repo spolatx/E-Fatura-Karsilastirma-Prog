@@ -1,7 +1,8 @@
 # ==============================================================================
 # Script: publish-for-windows.ps1
 # Description: Builds the Next.js static export, copies it to API wwwroot,
-#              and publishes the .NET 10 Web API as a single self-contained Win-x64 executable.
+#              cleans target output, and publishes the .NET 10 Web API as a
+#              single self-contained Win-x64 executable for Windows Service / SCM.
 # ==============================================================================
 
 $ErrorActionPreference = "Stop"
@@ -12,7 +13,7 @@ $FrontendOutDir = Join-Path $FrontendDir "out"
 $ApiProjectDir = Join-Path $RootDir "src\Presentation\InvoiceComparison.Api"
 $ApiProjectPath = Join-Path $ApiProjectDir "InvoiceComparison.Api.csproj"
 $WwwrootDir = Join-Path $ApiProjectDir "wwwroot"
-$PublishOutputDir = Join-Path $RootDir "PublishOutput"
+$PublishOutputDir = "C:\EksikFaturaApp"
 
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host " [1/4] Next.js Frontend Statik Export Derlemesi Başlatılıyor...  " -ForegroundColor Cyan
@@ -53,10 +54,26 @@ Copy-Item -Path "$FrontendOutDir\*" -Destination $WwwrootDir -Recurse -Force
 Write-Host "Statik dosyalar wwwroot içerisine başarıyla kopyalandı." -ForegroundColor Green
 
 Write-Host "`n=================================================================" -ForegroundColor Cyan
-Write-Host " [4/4] .NET 10 Tek Dosya (Self-Contained Win-x64) Yayınlanıyor..." -ForegroundColor Cyan
+Write-Host " [4/4] Hedef Temizliği ve .NET Tek Dosya EXE Yayınlanıyor...     " -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
-dotnet publish $ApiProjectPath -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $PublishOutputDir
+# Hedef klasör oluştur veya mevcutsa (wwwroot hariç) eski build artıklarını temizle
+if (Test-Path $PublishOutputDir) {
+    Write-Host "Hedef klasördeki eski derleme artıkları temizleniyor (wwwroot hariç): $PublishOutputDir" -ForegroundColor Yellow
+    Get-ChildItem -Path $PublishOutputDir -Exclude "wwwroot" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+} else {
+    New-Item -ItemType Directory -Path $PublishOutputDir -Force | Out-Null
+}
+
+# Windows Server SCM için tam bağımsız (self-contained), tek parça .exe üretimi
+dotnet publish $ApiProjectPath `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true `
+    -o $PublishOutputDir
 
 if ($LASTEXITCODE -ne 0) {
     throw ".NET publish işlemi başarısız oldu (Hata kodu: $LASTEXITCODE)."

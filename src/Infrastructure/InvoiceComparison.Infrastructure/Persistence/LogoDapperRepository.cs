@@ -57,27 +57,39 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
 
         // Queries both FICHENO and TRACKNR (ETTN) from LG_XXX_XX_STFICHE and LG_XXX_XX_INVOICE
         // filters for incoming invoice TRCODEs (1=Satınalma, 2=Perakende İade, 3=Toptan Satış İade, 4=Alınan Hizmet, 13=Fiyat Farkı, 14=Alınan Hizmet vb.)
+        // filtering by official issue date (DATE_) and ordered by DATE_ DESC, TIME_ DESC
         // and WITH (NOLOCK) so active Logo transactions are never blocked.
         var sql = $"""
             SELECT 
-                LTRIM(RTRIM(STF.[FICHENO])) AS FicheNo,
-                LTRIM(RTRIM(STF.[TRACKNR])) AS Ettn
-            FROM [{stficheTableName}] AS STF WITH (NOLOCK)
-            WHERE STF.[CANCELLED] = 0
-              AND STF.[DATE_] >= @StartDate
-              AND STF.[DATE_] <= @EndDate
-              AND STF.[TRCODE] IN (1, 2, 3, 4, 13, 14, 26)
+                LTRIM(RTRIM(T.[FicheNo])) AS FicheNo,
+                LTRIM(RTRIM(T.[Ettn])) AS Ettn
+            FROM
+            (
+                SELECT 
+                    STF.[FICHENO] AS FicheNo,
+                    STF.[TRACKNR] AS Ettn,
+                    STF.[DATE_] AS InvoiceDate,
+                    STF.[FTIME] AS InvoiceTime
+                FROM [{stficheTableName}] AS STF WITH (NOLOCK)
+                WHERE STF.[CANCELLED] = 0
+                  AND STF.[DATE_] >= @StartDate
+                  AND STF.[DATE_] <= @EndDate
+                  AND STF.[TRCODE] IN (1, 2, 3, 4, 13, 14, 26)
 
-            UNION
+                UNION ALL
 
-            SELECT 
-                LTRIM(RTRIM(INV.[FICHENO])) AS FicheNo,
-                LTRIM(RTRIM(INV.[TRACKNR])) AS Ettn
-            FROM [{invoiceTableName}] AS INV WITH (NOLOCK)
-            WHERE INV.[CANCELLED] = 0
-              AND INV.[DATE_] >= @StartDate
-              AND INV.[DATE_] <= @EndDate
-              AND INV.[TRCODE] IN (1, 2, 3, 4, 13, 14, 26);
+                SELECT 
+                    INV.[FICHENO] AS FicheNo,
+                    INV.[TRACKNR] AS Ettn,
+                    INV.[DATE_] AS InvoiceDate,
+                    INV.[TIME_] AS InvoiceTime
+                FROM [{invoiceTableName}] AS INV WITH (NOLOCK)
+                WHERE INV.[CANCELLED] = 0
+                  AND INV.[DATE_] >= @StartDate
+                  AND INV.[DATE_] <= @EndDate
+                  AND INV.[TRCODE] IN (1, 2, 3, 4, 13, 14, 26)
+            ) AS T
+            ORDER BY T.[InvoiceDate] DESC, T.[InvoiceTime] DESC;
             """;
 
         try
