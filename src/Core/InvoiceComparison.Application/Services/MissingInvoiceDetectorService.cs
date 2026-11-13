@@ -52,30 +52,47 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
             normalizedEndDate,
             cancellationToken);
 
-        var logoEttnsTask = _logoDatabaseRepository.GetExistingEttnsAsync(
+        var logoInvoicesTask = _logoDatabaseRepository.GetExistingInvoicesAsync(
             request.CompanyId,
             normalizedStartDate,
             normalizedEndDate,
             cancellationToken);
 
-        await Task.WhenAll(eLogoInvoicesTask, logoEttnsTask).ConfigureAwait(false);
+        await Task.WhenAll(eLogoInvoicesTask, logoInvoicesTask).ConfigureAwait(false);
 
         var eLogoInvoices = await eLogoInvoicesTask.ConfigureAwait(false);
-        var rawLogoEttns = await logoEttnsTask.ConfigureAwait(false);
+        var logoInvoices = await logoInvoicesTask.ConfigureAwait(false);
 
-        // Logo ERP'deki mevcut ETTN'leri temizleyerek HashSet'e at (Performans ve Case-Insensitive arama için)
-        var logoEttnSet = new HashSet<string>(
-            rawLogoEttns.Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e.Trim().Trim('{', '}')),
-            StringComparer.OrdinalIgnoreCase);
+        // 1. Logo'dan gelen Fatura No ve ETTN listelerini güvenli (Trim & ToUpperInvariant & {} strip) şekilde HashSet'e al
+        var existingEttns = new HashSet<string>(
+            logoInvoices.Where(x => !string.IsNullOrWhiteSpace(x.Ettn))
+                        .Select(x => x.Ettn!.Trim().Trim('{', '}').ToUpperInvariant())
+        );
+
+        var existingFicheNos = new HashSet<string>(
+            logoInvoices.Where(x => !string.IsNullOrWhiteSpace(x.FicheNo))
+                        .Select(x => x.FicheNo!.Trim().ToUpperInvariant())
+        );
 
         _logger.LogInformation(
-            "Company '{CompanyId}' comparison input: eLogo invoices count = {ELogoCount}, Logo ERP unique ETTNs count = {LogoCount}.",
+            "Company '{CompanyId}' comparison input: eLogo invoices count = {ELogoCount}, Logo ERP unique ETTNs = {EttnCount}, unique FicheNos = {FicheCount}.",
             request.CompanyId,
             eLogoInvoices.Count,
-            logoEttnSet.Count);
+            existingEttns.Count,
+            existingFicheNos.Count);
 
-        var missingInvoices = eLogoInvoices
-            .Where(inv => !string.IsNullOrWhiteSpace(inv.Ettn) && !logoEttnSet.Contains(inv.Ettn.Trim().Trim('{', '}')))
+        // 2. e-Logo'dan gelen faturaları filtrele (Hem ETTN hem Fatura No ile çift anahtarlı kıyasla)
+        var missingInvoices = eLogoInvoices.Where(eLogoInv =>
+            {
+                var eLogoEttn = eLogoInv.Ettn?.Trim().Trim('{', '}').ToUpperInvariant() ?? string.Empty;
+                var eLogoFicheNo = eLogoInv.InvoiceNumber?.Trim().ToUpperInvariant() ?? string.Empty;
+
+                // Fatura ETTN'si VEYA Fatura Numarası Logo'da varsa bu fatura EKSİK DEĞİLDİR (false döner, elenir)
+                var existsInLogo = (!string.IsNullOrWhiteSpace(eLogoEttn) && existingEttns.Contains(eLogoEttn)) ||
+                                   (!string.IsNullOrWhiteSpace(eLogoFicheNo) && existingFicheNos.Contains(eLogoFicheNo));
+
+                return !existsInLogo;
+            })
             .OrderByDescending(x => x.IssueDate)
             .ThenBy(x => x.InvoiceNumber, StringComparer.OrdinalIgnoreCase)
             .ToList();

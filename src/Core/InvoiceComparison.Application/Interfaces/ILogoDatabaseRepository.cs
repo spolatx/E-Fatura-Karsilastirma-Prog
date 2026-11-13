@@ -1,8 +1,10 @@
+using InvoiceComparison.Application.DTOs;
+
 namespace InvoiceComparison.Application.Interfaces;
 
 public interface ILogoDatabaseRepository
 {
-    Task<HashSet<string>> GetExistingEttnsAsync(
+    Task<IReadOnlyList<InvoiceIdentityDto>> GetExistingInvoicesAsync(
         string companyId,
         DateTime startDate,
         DateTime endDate,

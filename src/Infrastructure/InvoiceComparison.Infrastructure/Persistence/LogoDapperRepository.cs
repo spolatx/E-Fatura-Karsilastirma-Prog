@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Dapper;
+using InvoiceComparison.Application.DTOs;
 using InvoiceComparison.Application.Interfaces;
 using InvoiceComparison.Domain.Exceptions;
 using InvoiceComparison.Infrastructure.Configuration;
@@ -33,7 +34,7 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
             : configuration.GetConnectionString("LogoDatabase") ?? string.Empty;
     }
 
-    public async Task<HashSet<string>> GetExistingEttnsAsync(
+    public async Task<IReadOnlyList<InvoiceIdentityDto>> GetExistingInvoicesAsync(
         string companyId,
         DateTime startDate,
         DateTime endDate,
@@ -45,7 +46,7 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
         {
             throw new LogoDbException(
                 "Logo ERP SQL Server connection string is not configured (Check 'ConnectionStrings:LogoDatabase').",
-                databaseOperation: nameof(GetExistingEttnsAsync));
+                databaseOperation: nameof(GetExistingInvoicesAsync));
         }
 
         var company = _companyConfigService.GetCompany(companyId);
@@ -54,28 +55,29 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
         var stficheTableName = $"LG_{company.LogoFirmNumber}_{company.LogoPeriodNumber}_STFICHE";
         var invoiceTableName = $"LG_{company.LogoFirmNumber}_{company.LogoPeriodNumber}_INVOICE";
 
-        // Queries ETTN values from both LG_XXX_XX_STFICHE (TRACKNR) and LG_XXX_XX_INVOICE (TRACKNR)
-        // using WITH (NOLOCK) so active Logo ERP transactions are never blocked.
+        // Queries both FICHENO and TRACKNR (ETTN) from LG_XXX_XX_STFICHE and LG_XXX_XX_INVOICE
+        // filters for incoming invoice TRCODEs (1=Satınalma, 2=Perakende İade, 3=Toptan Satış İade, 4=Alınan Hizmet, 13=Fiyat Farkı, 14=Alınan Hizmet vb.)
+        // and WITH (NOLOCK) so active Logo transactions are never blocked.
         var sql = $"""
-            SELECT DISTINCT
+            SELECT 
+                LTRIM(RTRIM(STF.[FICHENO])) AS FicheNo,
                 LTRIM(RTRIM(STF.[TRACKNR])) AS Ettn
             FROM [{stficheTableName}] AS STF WITH (NOLOCK)
             WHERE STF.[CANCELLED] = 0
               AND STF.[DATE_] >= @StartDate
               AND STF.[DATE_] <= @EndDate
-              AND STF.[TRACKNR] IS NOT NULL
-              AND LEN(LTRIM(RTRIM(STF.[TRACKNR]))) >= 32
+              AND STF.[TRCODE] IN (1, 2, 3, 4, 13, 14, 26)
 
             UNION
 
-            SELECT DISTINCT
+            SELECT 
+                LTRIM(RTRIM(INV.[FICHENO])) AS FicheNo,
                 LTRIM(RTRIM(INV.[TRACKNR])) AS Ettn
             FROM [{invoiceTableName}] AS INV WITH (NOLOCK)
             WHERE INV.[CANCELLED] = 0
               AND INV.[DATE_] >= @StartDate
               AND INV.[DATE_] <= @EndDate
-              AND INV.[TRACKNR] IS NOT NULL
-              AND LEN(LTRIM(RTRIM(INV.[TRACKNR]))) >= 32;
+              AND INV.[TRCODE] IN (1, 2, 3, 4, 13, 14, 26);
             """;
 
         try
@@ -93,22 +95,17 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
                 commandTimeout: _options.CommandTimeoutSeconds,
                 cancellationToken: cancellationToken);
 
-            var ettns = await connection.QueryAsync<string>(command).ConfigureAwait(false);
-
-            var resultHashSet = new HashSet<string>(
-                ettns.Where(ettn => !string.IsNullOrWhiteSpace(ettn))
-                     .Select(ettn => ettn.Trim().Trim('{', '}')),
-                StringComparer.OrdinalIgnoreCase);
+            var invoices = (await connection.QueryAsync<InvoiceIdentityDto>(command).ConfigureAwait(false)).ToList();
 
             _logger.LogInformation(
-                "Retrieved {Count} distinct ETTNs from Logo ERP tables [{StficheTable}] / [{InvoiceTable}] for company '{CompanyId}' ({Range}).",
-                resultHashSet.Count,
+                "Retrieved {Count} distinct invoices from Logo ERP tables [{StficheTable}] / [{InvoiceTable}] for company '{CompanyId}' ({Range}).",
+                invoices.Count,
                 stficheTableName,
                 invoiceTableName,
                 companyId,
                 $"{startDate:yyyy-MM-dd} - {endDate:yyyy-MM-dd}");
 
-            return resultHashSet;
+            return invoices;
         }
         catch (SqlException ex)
         {
@@ -121,8 +118,8 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
                 companyId);
 
             throw new LogoDbException(
-                $"Database error occurred while reading ETTNs from Logo ERP: {ex.Message}",
-                databaseOperation: nameof(GetExistingEttnsAsync),
+                $"Database error occurred while reading invoices from Logo ERP: {ex.Message}",
+                databaseOperation: nameof(GetExistingInvoicesAsync),
                 sqlErrorNumber: ex.Number,
                 innerException: ex);
         }
@@ -132,7 +129,7 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
 
             throw new LogoDbException(
                 $"Unexpected database error while querying Logo ERP: {ex.Message}",
-                databaseOperation: nameof(GetExistingEttnsAsync),
+                databaseOperation: nameof(GetExistingInvoicesAsync),
                 innerException: ex);
         }
     }
