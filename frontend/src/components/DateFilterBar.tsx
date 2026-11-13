@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Calendar, Filter, RefreshCw } from 'lucide-react';
+import { Calendar, Filter, RefreshCw, Info } from 'lucide-react';
 
 interface DateFilterBarProps {
   isLoading: boolean;
@@ -63,9 +63,15 @@ export function DateFilterBar({ isLoading, onSearch }: DateFilterBarProps) {
         <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 flex-1">
           {/* Start Date */}
           <div className="w-full sm:w-auto">
-            <label htmlFor="startDate" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-              Başlangıç Tarihi
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="startDate" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                Başlangıç Tarihi
+              </label>
+              <span className="inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50 border border-blue-100 font-medium px-1.5 py-0.5 rounded ml-2" title="Filtreleme fatura kesim tarihi (IssueDate) baz alınarak yapılır">
+                <Info className="w-3 h-3 text-blue-600" />
+                Kesim Tarihi Bazlı
+              </span>
+            </div>
             <div className="relative rounded-lg border border-slate-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all bg-slate-50/50">
               <input
                 id="startDate"
@@ -81,9 +87,15 @@ export function DateFilterBar({ isLoading, onSearch }: DateFilterBarProps) {
 
           {/* End Date */}
           <div className="w-full sm:w-auto">
-            <label htmlFor="endDate" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-              Bitiş Tarihi
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="endDate" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                Bitiş Tarihi
+              </label>
+              <span className="inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50 border border-blue-100 font-medium px-1.5 py-0.5 rounded ml-2" title="Filtreleme fatura kesim tarihi (IssueDate) baz alınarak yapılır">
+                <Info className="w-3 h-3 text-blue-600" />
+                Kesim Tarihi Bazlı
+              </span>
+            </div>
             <div className="relative rounded-lg border border-slate-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all bg-slate-50/50">
               <input
                 id="endDate"

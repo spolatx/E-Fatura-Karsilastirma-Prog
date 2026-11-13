@@ -11,7 +11,6 @@ import {
   Loader2,
   ArrowDown,
   ArrowUp,
-  ArrowUpDown,
 } from 'lucide-react';
 
 interface MissingInvoiceGridProps {
@@ -101,7 +100,7 @@ export function MissingInvoiceGrid({
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Faturalar kesim tarihine göre en yeniden eskiye doğru sıralanmaktadır.
+            Faturalar kesim tarihine (Issue Date) göre en yeniden eskiye doğru sıralanmaktadır.
           </p>
         </div>
 
@@ -127,10 +126,10 @@ export function MissingInvoiceGrid({
                 <button
                   type="button"
                   onClick={toggleSort}
-                  className="inline-flex items-center gap-1 font-semibold uppercase hover:text-blue-600 cursor-pointer"
-                  title="Kesim Tarihine göre sırala"
+                  className="inline-flex items-center gap-1.5 font-semibold uppercase hover:text-blue-600 cursor-pointer"
+                  title="Fatura Kesim Tarihine (Issue Date) göre sırala"
                 >
-                  <span>Kesim Tarihi</span>
+                  <span>Kesim Tarihi (Issue Date)</span>
                   {sortDirection === 'desc' ? (
                     <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
                   ) : (
@@ -176,8 +175,11 @@ export function MissingInvoiceGrid({
                     }`}
                   >
                     {/* Issue Date */}
-                    <td className="py-3.5 px-4 font-semibold text-slate-800 whitespace-nowrap">
-                      {formatDate(inv.issueDate)}
+                    <td className="py-3.5 px-4 font-semibold text-slate-800 whitespace-nowrap" title="Fatura Kesim Tarihi (Issue Date)">
+                      <div className="flex flex-col">
+                        <span>{formatDate(inv.issueDate)}</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Kesim Tarihi</span>
+                      </div>
                     </td>
 
                     {/* Invoice Number */}
