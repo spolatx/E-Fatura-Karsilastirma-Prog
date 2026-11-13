@@ -1,14 +1,26 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Calendar, Filter, RefreshCw, Info } from 'lucide-react';
+import { Calendar, Filter, RefreshCw, Info, Building2 } from 'lucide-react';
+import { CompanyItem } from '@/types/invoice';
 
 interface DateFilterBarProps {
+  companies: CompanyItem[];
+  selectedCompanyId: string;
+  onCompanyChange: (companyId: string) => void;
+  isCompaniesLoading: boolean;
   isLoading: boolean;
-  onSearch: (startDate: string, endDate: string) => void;
+  onSearch: (companyId: string, startDate: string, endDate: string) => void;
 }
 
-export function DateFilterBar({ isLoading, onSearch }: DateFilterBarProps) {
+export function DateFilterBar({
+  companies,
+  selectedCompanyId,
+  onCompanyChange,
+  isCompaniesLoading,
+  isLoading,
+  onSearch,
+}: DateFilterBarProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -24,7 +36,7 @@ export function DateFilterBar({ isLoading, onSearch }: DateFilterBarProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!startDate || !endDate) return;
-    onSearch(startDate, endDate);
+    onSearch(selectedCompanyId, startDate, endDate);
   };
 
   const setPresetRange = (preset: 'today' | 'thisWeek' | 'thisMonth' | 'lastMonth') => {
@@ -54,13 +66,50 @@ export function DateFilterBar({ isLoading, onSearch }: DateFilterBarProps) {
     const e = formatDate(end);
     setStartDate(s);
     setEndDate(e);
-    onSearch(s, e);
+    if (selectedCompanyId) {
+      onSearch(selectedCompanyId, s, e);
+    }
   };
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-xs p-5">
       <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 flex-1">
+        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 flex-1 flex-wrap">
+          {/* Company Selection */}
+          <div className="w-full sm:w-64">
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="companySelect" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                Firma Seçimi
+              </label>
+              {isCompaniesLoading && (
+                <span className="text-[10px] text-slate-400 animate-pulse">Yükleniyor...</span>
+              )}
+            </div>
+            <div className="relative rounded-lg border border-slate-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all bg-slate-50/50">
+              <select
+                id="companySelect"
+                value={selectedCompanyId}
+                onChange={(e) => onCompanyChange(e.target.value)}
+                disabled={isCompaniesLoading || companies.length === 0}
+                className="w-full py-2.5 px-3 pl-10 pr-8 text-sm text-slate-800 bg-transparent rounded-lg outline-none font-medium appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {companies.length === 0 ? (
+                  <option value="">Firma bulunamadı</option>
+                ) : (
+                  companies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))
+                )}
+              </select>
+              <Building2 className="w-4 h-4 text-blue-600 absolute left-3 top-3.5 pointer-events-none" />
+              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-slate-500 text-xs">
+                ▼
+              </div>
+            </div>
+          </div>
+
           {/* Start Date */}
           <div className="w-full sm:w-auto">
             <div className="flex items-center justify-between mb-1.5">
@@ -146,7 +195,7 @@ export function DateFilterBar({ isLoading, onSearch }: DateFilterBarProps) {
         <div>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !selectedCompanyId}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
             {isLoading ? (

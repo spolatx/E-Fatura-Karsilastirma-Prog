@@ -5,6 +5,11 @@ export type InvoiceIntegrationStatus =
   | 'archived'
   | 'cancelled';
 
+export interface CompanyItem {
+  id: string;
+  name: string;
+}
+
 export interface InvoiceSummary {
   ettn: string;
   invoiceNumber: string;
@@ -51,4 +56,3 @@ export interface ToastMessage {
   description: string;
   type: 'success' | 'error' | 'info';
 }
-

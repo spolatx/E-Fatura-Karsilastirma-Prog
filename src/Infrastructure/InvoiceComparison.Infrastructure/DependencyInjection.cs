@@ -22,6 +22,10 @@ public static class DependencyInjection
         services.Configure<ELogoOptions>(
             configuration.GetSection(ELogoOptions.SectionName));
 
+        services.AddSingleton<CompanyConfigurationProvider>();
+        services.AddSingleton<ICompanyConfigService>(sp => sp.GetRequiredService<CompanyConfigurationProvider>());
+        services.AddSingleton<ICompanyProvider>(sp => sp.GetRequiredService<CompanyConfigurationProvider>());
+
         services.AddScoped<ILogoDatabaseRepository, LogoDapperRepository>();
         services.AddScoped<IELogoIntegrationService, ELogoIntegrationService>();
 

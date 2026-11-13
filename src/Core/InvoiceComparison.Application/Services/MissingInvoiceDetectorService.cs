@@ -8,16 +8,24 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
 {
     private readonly IELogoIntegrationService _eLogoIntegrationService;
     private readonly ILogoDatabaseRepository _logoDatabaseRepository;
+    private readonly ICompanyProvider _companyProvider;
     private readonly ILogger<MissingInvoiceDetectorService> _logger;
 
     public MissingInvoiceDetectorService(
         IELogoIntegrationService eLogoIntegrationService,
         ILogoDatabaseRepository logoDatabaseRepository,
+        ICompanyProvider companyProvider,
         ILogger<MissingInvoiceDetectorService> logger)
     {
         _eLogoIntegrationService = eLogoIntegrationService ?? throw new ArgumentNullException(nameof(eLogoIntegrationService));
         _logoDatabaseRepository = logoDatabaseRepository ?? throw new ArgumentNullException(nameof(logoDatabaseRepository));
+        _companyProvider = companyProvider ?? throw new ArgumentNullException(nameof(companyProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public IReadOnlyList<CompanyDto> GetCompanies()
+    {
+        return _companyProvider.GetCompanies();
     }
 
     public async Task<MissingInvoicesResponse> DetectMissingInvoicesAsync(
@@ -25,23 +33,27 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.CompanyId);
         ValidateDateRange(request.StartDate, request.EndDate);
 
         var normalizedStartDate = request.StartDate.Date;
         var normalizedEndDate = request.EndDate.Date.AddDays(1).AddTicks(-1);
 
         _logger.LogInformation(
-            "Starting missing invoice detection between {StartDate:yyyy-MM-dd} and {EndDate:yyyy-MM-dd}.",
+            "Starting missing invoice detection for Company '{CompanyId}' between {StartDate:yyyy-MM-dd} and {EndDate:yyyy-MM-dd}.",
+            request.CompanyId,
             normalizedStartDate,
             normalizedEndDate);
 
-        // Execute integrator API call and local ERP SQL query concurrently
+        // Execute integrator API call and local ERP SQL query concurrently with companyId
         var eLogoInvoicesTask = _eLogoIntegrationService.GetInvoicesAsync(
+            request.CompanyId,
             normalizedStartDate,
             normalizedEndDate,
             cancellationToken);
 
         var logoEttnsTask = _logoDatabaseRepository.GetExistingEttnsAsync(
+            request.CompanyId,
             normalizedStartDate,
             normalizedEndDate,
             cancellationToken);
@@ -65,7 +77,8 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
         var matchedCount = eLogoInvoices.Count - missingInvoices.Count;
 
         _logger.LogInformation(
-            "Comparison completed. eLogo Count: {TotalCount}, Matched in Logo ERP: {MatchedCount}, Missing in Logo ERP: {MissingCount}.",
+            "Comparison completed for Company '{CompanyId}'. eLogo Count: {TotalCount}, Matched in Logo ERP: {MatchedCount}, Missing in Logo ERP: {MissingCount}.",
+            request.CompanyId,
             eLogoInvoices.Count,
             matchedCount,
             missingInvoices.Count);
@@ -82,25 +95,29 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
     }
 
     public async Task<byte[]> GetInvoicePdfAsync(
+        string companyId,
         string ettn,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyId);
         ArgumentException.ThrowIfNullOrWhiteSpace(ettn);
         var normalizedEttn = ettn.Trim();
 
-        _logger.LogInformation("Requesting invoice PDF from eLogo for ETTN: {Ettn}", normalizedEttn);
-        return await _eLogoIntegrationService.GetInvoicePdfAsync(normalizedEttn, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Requesting invoice PDF from eLogo for Company '{CompanyId}', ETTN: {Ettn}", companyId, normalizedEttn);
+        return await _eLogoIntegrationService.GetInvoicePdfAsync(companyId, normalizedEttn, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<MarkInvoiceUnreadResponse> MarkInvoiceAsUnreadAsync(
+        string companyId,
         string ettn,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyId);
         ArgumentException.ThrowIfNullOrWhiteSpace(ettn);
         var normalizedEttn = ettn.Trim();
 
-        _logger.LogInformation("Marking invoice as unread (returning to Inbox) in eLogo for ETTN: {Ettn}", normalizedEttn);
-        var isSuccess = await _eLogoIntegrationService.MarkAsUnreadAsync(normalizedEttn, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Marking invoice as unread (returning to Inbox) in eLogo for Company '{CompanyId}', ETTN: {Ettn}", companyId, normalizedEttn);
+        var isSuccess = await _eLogoIntegrationService.MarkAsUnreadAsync(companyId, normalizedEttn, cancellationToken).ConfigureAwait(false);
 
         return new MarkInvoiceUnreadResponse
         {

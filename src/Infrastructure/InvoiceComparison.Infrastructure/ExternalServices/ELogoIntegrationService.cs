@@ -20,27 +20,34 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
     private static readonly XNamespace UblCacNs = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
 
     private readonly ELogoOptions _options;
+    private readonly ICompanyConfigService _companyConfigService;
     private readonly ILogger<ELogoIntegrationService> _logger;
 
     public ELogoIntegrationService(
         IOptions<ELogoOptions> options,
+        ICompanyConfigService companyConfigService,
         ILogger<ELogoIntegrationService> logger)
     {
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _companyConfigService = companyConfigService ?? throw new ArgumentNullException(nameof(companyConfigService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<IReadOnlyList<InvoiceSummary>> GetInvoicesAsync(
+        string companyId,
         DateTime startDate,
         DateTime endDate,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyId);
+        var company = _companyConfigService.GetCompany(companyId);
+
         var client = CreateClient();
         string? sessionID = null;
 
         try
         {
-            sessionID = await LoginAsync(client, cancellationToken).ConfigureAwait(false);
+            sessionID = await LoginAsync(client, company.ELogoUserName, company.ELogoPassword, cancellationToken).ConfigureAwait(false);
 
             var documentType = string.IsNullOrWhiteSpace(_options.DocumentType) ? "EINVOICE" : _options.DocumentType;
             var paramList = new[]
@@ -53,7 +60,9 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
             };
 
             _logger.LogInformation(
-                "Calling eLogo WCF GetDocumentList between {StartDate:yyyy-MM-dd} and {EndDate:yyyy-MM-dd}.",
+                "Calling eLogo WCF GetDocumentList for Company '{CompanyId}' ({UserName}) between {StartDate:yyyy-MM-dd} and {EndDate:yyyy-MM-dd}.",
+                company.Id,
+                company.ELogoUserName,
                 startDate,
                 endDate);
 
@@ -62,7 +71,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
 
             if (response?.docList is null || response.docList.Length == 0)
             {
-                _logger.LogInformation("No incoming e-Invoices found on eLogo in the requested date range.");
+                _logger.LogInformation("No incoming e-Invoices found on eLogo in the requested date range for company '{CompanyId}'.", company.Id);
                 return [];
             }
 
@@ -106,12 +115,12 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
                 }
             }
 
-            _logger.LogInformation("Successfully retrieved {Count} incoming e-Invoices from eLogo WCF.", invoices.Count);
+            _logger.LogInformation("Successfully retrieved {Count} incoming e-Invoices from eLogo WCF for company '{CompanyId}'.", invoices.Count, company.Id);
             return invoices;
         }
         catch (FaultException ex)
         {
-            _logger.LogError(ex, "eLogo WCF Fault occurred in GetInvoicesAsync.");
+            _logger.LogError(ex, "eLogo WCF Fault occurred in GetInvoicesAsync for company '{CompanyId}'.", company.Id);
             throw new ELogoApiException(
                 $"eLogo WCF service fault: {ex.Message}",
                 operationName: nameof(GetInvoicesAsync),
@@ -119,7 +128,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
         }
         catch (CommunicationException ex)
         {
-            _logger.LogError(ex, "WCF communication error occurred while calling eLogo.");
+            _logger.LogError(ex, "WCF communication error occurred while calling eLogo for company '{CompanyId}'.", company.Id);
             throw new ELogoApiException(
                 $"Communication error connecting to eLogo WCF service: {ex.Message}",
                 operationName: nameof(GetInvoicesAsync),
@@ -132,17 +141,20 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
     }
 
     public async Task<byte[]> GetInvoicePdfAsync(
+        string companyId,
         string ettn,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyId);
         ArgumentException.ThrowIfNullOrWhiteSpace(ettn);
+        var company = _companyConfigService.GetCompany(companyId);
 
         var client = CreateClient();
         string? sessionID = null;
 
         try
         {
-            sessionID = await LoginAsync(client, cancellationToken).ConfigureAwait(false);
+            sessionID = await LoginAsync(client, company.ELogoUserName, company.ELogoPassword, cancellationToken).ConfigureAwait(false);
 
             var documentType = string.IsNullOrWhiteSpace(_options.DocumentType) ? "EINVOICE" : _options.DocumentType;
             var paramList = new[]
@@ -152,7 +164,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
                 "DIRECTION=IN"
             };
 
-            _logger.LogInformation("Requesting PDF document from eLogo WCF for ETTN: {Ettn}", ettn);
+            _logger.LogInformation("Requesting PDF document from eLogo WCF for Company '{CompanyId}', ETTN: {Ettn}", company.Id, ettn);
 
             var request = new GetDocumentDataRequest(sessionID, ettn.Trim(), paramList);
             var response = await client.GetDocumentDataAsync(request).ConfigureAwait(false);
@@ -167,7 +179,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
         }
         catch (FaultException ex)
         {
-            _logger.LogError(ex, "eLogo WCF Fault occurred in GetInvoicePdfAsync for ETTN {Ettn}.", ettn);
+            _logger.LogError(ex, "eLogo WCF Fault occurred in GetInvoicePdfAsync for Company '{CompanyId}', ETTN {Ettn}.", company.Id, ettn);
             if (ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
                 ex.Message.Contains("bulunamadı", StringComparison.OrdinalIgnoreCase))
             {
@@ -181,7 +193,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
         }
         catch (CommunicationException ex)
         {
-            _logger.LogError(ex, "WCF communication error occurred in GetInvoicePdfAsync for ETTN {Ettn}.", ettn);
+            _logger.LogError(ex, "WCF communication error occurred in GetInvoicePdfAsync for Company '{CompanyId}', ETTN {Ettn}.", company.Id, ettn);
             throw new ELogoApiException(
                 $"Communication error connecting to eLogo WCF service: {ex.Message}",
                 operationName: nameof(GetInvoicePdfAsync),
@@ -194,17 +206,20 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
     }
 
     public async Task<bool> MarkAsUnreadAsync(
+        string companyId,
         string ettn,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyId);
         ArgumentException.ThrowIfNullOrWhiteSpace(ettn);
+        var company = _companyConfigService.GetCompany(companyId);
 
         var client = CreateClient();
         string? sessionID = null;
 
         try
         {
-            sessionID = await LoginAsync(client, cancellationToken).ConfigureAwait(false);
+            sessionID = await LoginAsync(client, company.ELogoUserName, company.ELogoPassword, cancellationToken).ConfigureAwait(false);
 
             var documentType = string.IsNullOrWhiteSpace(_options.DocumentType) ? "EINVOICE" : _options.DocumentType;
             var paramList = new[]
@@ -215,7 +230,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
                 "ISMARKED=0"
             };
 
-            _logger.LogInformation("Calling eLogo WCF GetDocumentDone to mark ETTN {Ettn} as unread.", ettn);
+            _logger.LogInformation("Calling eLogo WCF GetDocumentDone to mark ETTN {Ettn} as unread for Company '{CompanyId}'.", ettn, company.Id);
 
             var result = await client.GetDocumentDoneAsync(sessionID, ettn.Trim(), paramList).ConfigureAwait(false);
 
@@ -224,12 +239,12 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
                 return true;
             }
 
-            // eLogo returns resultCode = 1 or 0 for success
             var isSuccess = result.resultCode is 1 or 0 || result.errorCode == 0;
             if (!isSuccess && !string.IsNullOrWhiteSpace(result.resultMsg))
             {
                 _logger.LogWarning(
-                    "eLogo returned non-success result: {ResultMsg} (Code: {Code})",
+                    "eLogo returned non-success result for Company '{CompanyId}': {ResultMsg} (Code: {Code})",
+                    company.Id,
                     result.resultMsg,
                     result.resultCode);
             }
@@ -238,7 +253,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
         }
         catch (FaultException ex)
         {
-            _logger.LogError(ex, "eLogo WCF Fault occurred in MarkAsUnreadAsync for ETTN {Ettn}.", ettn);
+            _logger.LogError(ex, "eLogo WCF Fault occurred in MarkAsUnreadAsync for Company '{CompanyId}', ETTN {Ettn}.", company.Id, ettn);
             throw new ELogoApiException(
                 $"eLogo WCF fault while marking invoice as unread: {ex.Message}",
                 operationName: nameof(MarkAsUnreadAsync),
@@ -246,7 +261,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
         }
         catch (CommunicationException ex)
         {
-            _logger.LogError(ex, "WCF communication error occurred in MarkAsUnreadAsync for ETTN {Ettn}.", ettn);
+            _logger.LogError(ex, "WCF communication error occurred in MarkAsUnreadAsync for Company '{CompanyId}', ETTN {Ettn}.", company.Id, ettn);
             throw new ELogoApiException(
                 $"Communication error connecting to eLogo WCF service: {ex.Message}",
                 operationName: nameof(MarkAsUnreadAsync),
@@ -304,19 +319,19 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
         return new PostBoxServiceClient(binding, endpointAddress);
     }
 
-    private async Task<string> LoginAsync(PostBoxServiceClient client, CancellationToken cancellationToken)
+    private static async Task<string> LoginAsync(PostBoxServiceClient client, string userName, string password, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.UserName) || string.IsNullOrWhiteSpace(_options.Password))
+        if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
         {
             throw new ELogoApiException(
-                "eLogo credentials (UserName, Password) are not configured.",
+                "eLogo credentials (UserName, Password) are not configured for this company.",
                 operationName: "Login");
         }
 
         var loginType = new LoginType
         {
-            userName = _options.UserName.Trim(),
-            passWord = _options.Password.Trim(),
+            userName = userName.Trim(),
+            passWord = password.Trim(),
             appStr = "InvoiceComparisonService",
             version = "1.0"
         };
@@ -327,7 +342,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
         if (!loginResponse.LoginResult || string.IsNullOrWhiteSpace(loginResponse.sessionID))
         {
             throw new ELogoApiException(
-                "eLogo authentication failed. Please verify your Web Service credentials.",
+                $"eLogo authentication failed for user '{userName}'. Please verify your Web Service credentials.",
                 operationName: "Login");
         }
 
@@ -443,7 +458,6 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
 
     private static byte[] ExtractEntryFromZipIfCompressed(byte[] rawBytes, string preferredExtension)
     {
-        // PK\x03\x04 zip header check
         if (rawBytes.Length >= 4 &&
             rawBytes[0] == 0x50 &&
             rawBytes[1] == 0x4B &&

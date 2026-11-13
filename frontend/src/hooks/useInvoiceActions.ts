@@ -1,18 +1,24 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  CompanyItem,
   InvoiceSummary,
   MissingInvoicesResponse,
   ToastMessage,
 } from '@/types/invoice';
 import {
+  fetchCompanies,
   fetchInvoicePdfBlob,
   fetchMissingInvoices,
   markInvoiceAsUnread,
 } from '@/services/invoiceApi';
 
 export function useInvoiceActions() {
+  const [companies, setCompanies] = useState<CompanyItem[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [isCompaniesLoading, setIsCompaniesLoading] = useState<boolean>(true);
+
   const [data, setData] = useState<MissingInvoicesResponse | null>(null);
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
   const [markedEttns, setMarkedEttns] = useState<Set<string>>(new Set());
@@ -45,11 +51,47 @@ export function useInvoiceActions() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  // Fetch companies on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadCompanies() {
+      setIsCompaniesLoading(true);
+      try {
+        const list = await fetchCompanies();
+        if (isMounted) {
+          setCompanies(list);
+          if (list.length > 0) {
+            setSelectedCompanyId(list[0].id);
+          }
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          const msg = err instanceof Error ? err.message : 'Firma listesi yüklenemedi.';
+          addToast('Firma Listesi Hatası', msg, 'error');
+        }
+      } finally {
+        if (isMounted) {
+          setIsCompaniesLoading(false);
+        }
+      }
+    }
+
+    loadCompanies();
+    return () => {
+      isMounted = false;
+    };
+  }, [addToast]);
+
   const searchMissingInvoices = useCallback(
-    async (startDate: string, endDate: string) => {
+    async (companyId: string, startDate: string, endDate: string) => {
+      if (!companyId) {
+        addToast('Firma Seçilmedi', 'Lütfen işlem yapmak istediğiniz firmayı seçin.', 'error');
+        return;
+      }
+
       setIsLoading(true);
       try {
-        const result = await fetchMissingInvoices(startDate, endDate);
+        const result = await fetchMissingInvoices(companyId, startDate, endDate);
         setData(result);
         setInvoices(result.missingInvoices);
         setMarkedEttns(new Set());
@@ -79,6 +121,11 @@ export function useInvoiceActions() {
 
   const openPdfViewer = useCallback(
     async (invoice: InvoiceSummary) => {
+      if (!selectedCompanyId) {
+        addToast('Hata', 'Firma bilgisi bulunamadı.', 'error');
+        return;
+      }
+
       setPdfActiveInvoice(invoice);
       setIsPdfLoading(true);
       setPdfModalOpen(true);
@@ -90,7 +137,7 @@ export function useInvoiceActions() {
       }
 
       try {
-        const blob = await fetchInvoicePdfBlob(invoice.ettn);
+        const blob = await fetchInvoicePdfBlob(selectedCompanyId, invoice.ettn);
         const url = URL.createObjectURL(blob);
         setPdfBlobUrl(url);
       } catch (err: unknown) {
@@ -101,7 +148,7 @@ export function useInvoiceActions() {
         setIsPdfLoading(false);
       }
     },
-    [addToast, pdfBlobUrl]
+    [addToast, pdfBlobUrl, selectedCompanyId]
   );
 
   const closePdfViewer = useCallback(() => {
@@ -115,11 +162,15 @@ export function useInvoiceActions() {
 
   const handleMarkAsUnread = useCallback(
     async (invoice: InvoiceSummary) => {
+      if (!selectedCompanyId) {
+        addToast('Hata', 'Firma bilgisi bulunamadı.', 'error');
+        return;
+      }
+
       setActionLoadingEttn(invoice.ettn);
       try {
-        const result = await markInvoiceAsUnread(invoice.ettn);
+        const result = await markInvoiceAsUnread(selectedCompanyId, invoice.ettn);
         if (result.isSuccess) {
-          // Visually mark row as inbox-returned and update local state
           setMarkedEttns((prev) => new Set(prev).add(invoice.ettn));
 
           addToast(
@@ -137,10 +188,14 @@ export function useInvoiceActions() {
         setActionLoadingEttn(null);
       }
     },
-    [addToast]
+    [addToast, selectedCompanyId]
   );
 
   return {
+    companies,
+    selectedCompanyId,
+    setSelectedCompanyId,
+    isCompaniesLoading,
     data,
     invoices,
     markedEttns,
@@ -158,4 +213,3 @@ export function useInvoiceActions() {
     removeToast,
   };
 }
-

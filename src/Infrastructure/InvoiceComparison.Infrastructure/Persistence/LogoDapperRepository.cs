@@ -14,38 +14,45 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
 {
     private readonly string _connectionString;
     private readonly LogoDatabaseOptions _options;
+    private readonly ICompanyConfigService _companyConfigService;
     private readonly ILogger<LogoDapperRepository> _logger;
 
     public LogoDapperRepository(
         IConfiguration configuration,
         IOptions<LogoDatabaseOptions> options,
+        ICompanyConfigService companyConfigService,
         ILogger<LogoDapperRepository> logger)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _companyConfigService = companyConfigService ?? throw new ArgumentNullException(nameof(companyConfigService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _connectionString = !string.IsNullOrWhiteSpace(_options.ConnectionString)
             ? _options.ConnectionString
             : configuration.GetConnectionString("LogoDatabase") ?? string.Empty;
-
-        ValidateTableIdentifiers(_options.FirmNumber, _options.PeriodNumber);
     }
 
     public async Task<HashSet<string>> GetExistingEttnsAsync(
+        string companyId,
         DateTime startDate,
         DateTime endDate,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyId);
+
         if (string.IsNullOrWhiteSpace(_connectionString))
         {
             throw new LogoDbException(
-                "Logo ERP SQL Server connection string is not configured (Check 'ConnectionStrings:LogoDatabase' or 'LogoDatabase:ConnectionString').",
+                "Logo ERP SQL Server connection string is not configured (Check 'ConnectionStrings:LogoDatabase').",
                 databaseOperation: nameof(GetExistingEttnsAsync));
         }
 
-        var stficheTableName = $"LG_{_options.FirmNumber}_{_options.PeriodNumber}_STFICHE";
-        var invoiceTableName = $"LG_{_options.FirmNumber}_{_options.PeriodNumber}_INVOICE";
+        var company = _companyConfigService.GetCompany(companyId);
+        ValidateTableIdentifiers(company.LogoFirmNumber, company.LogoPeriodNumber);
+
+        var stficheTableName = $"LG_{company.LogoFirmNumber}_{company.LogoPeriodNumber}_STFICHE";
+        var invoiceTableName = $"LG_{company.LogoFirmNumber}_{company.LogoPeriodNumber}_INVOICE";
 
         // Queries ETTN values from both LG_XXX_XX_STFICHE (TRACKNR) and LG_XXX_XX_INVOICE (TRACKNR)
         // using WITH (NOLOCK) so active Logo ERP transactions are never blocked.
@@ -94,12 +101,12 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
                 StringComparer.OrdinalIgnoreCase);
 
             _logger.LogInformation(
-                "Retrieved {Count} distinct ETTNs from Logo ERP tables [{StficheTable}] / [{InvoiceTable}] for range {StartDate:yyyy-MM-dd} - {EndDate:yyyy-MM-dd}.",
+                "Retrieved {Count} distinct ETTNs from Logo ERP tables [{StficheTable}] / [{InvoiceTable}] for company '{CompanyId}' ({Range}).",
                 resultHashSet.Count,
                 stficheTableName,
                 invoiceTableName,
-                startDate,
-                endDate);
+                companyId,
+                $"{startDate:yyyy-MM-dd} - {endDate:yyyy-MM-dd}");
 
             return resultHashSet;
         }
@@ -107,10 +114,11 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
         {
             _logger.LogError(
                 ex,
-                "SQL error #{SqlErrorNumber} occurred while querying Logo ERP tables [{StficheTable}] / [{InvoiceTable}].",
+                "SQL error #{SqlErrorNumber} occurred while querying Logo ERP tables [{StficheTable}] / [{InvoiceTable}] for company '{CompanyId}'.",
                 ex.Number,
                 stficheTableName,
-                invoiceTableName);
+                invoiceTableName,
+                companyId);
 
             throw new LogoDbException(
                 $"Database error occurred while reading ETTNs from Logo ERP: {ex.Message}",
@@ -120,7 +128,7 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
         }
         catch (Exception ex) when (ex is not LogoDbException and not OperationCanceledException)
         {
-            _logger.LogError(ex, "Unexpected error while querying Logo ERP database.");
+            _logger.LogError(ex, "Unexpected error while querying Logo ERP database for company '{CompanyId}'.", companyId);
 
             throw new LogoDbException(
                 $"Unexpected database error while querying Logo ERP: {ex.Message}",
@@ -152,4 +160,3 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
     [GeneratedRegex(@"^\d{2}$", RegexOptions.Compiled)]
     private static partial Regex PeriodNumberRegex();
 }
-
