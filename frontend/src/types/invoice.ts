@@ -32,6 +32,7 @@ export interface MissingInvoicesResponse {
   totalErpMatchedCount: number;
   missingInvoicesCount: number;
   missingInvoices: InvoiceSummary[];
+  matchedInvoices: InvoiceSummary[];
 }
 
 export interface MarkInvoiceUnreadResponse {

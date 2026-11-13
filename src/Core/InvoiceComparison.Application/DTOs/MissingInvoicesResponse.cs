@@ -10,5 +10,7 @@ public sealed record MissingInvoicesResponse
     public required int TotalErpMatchedCount { get; init; }
     public required int MissingInvoicesCount { get; init; }
     public required IReadOnlyList<InvoiceSummary> MissingInvoices { get; init; }
+    public IReadOnlyList<InvoiceSummary> MatchedInvoices { get; init; } = [];
 }
+
 

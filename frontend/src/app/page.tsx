@@ -16,7 +16,11 @@ export default function HomePage() {
     setSelectedCompanyId,
     isCompaniesLoading,
     data,
-    invoices,
+    activeTab,
+    setActiveTab,
+    missingInvoices,
+    matchedInvoices,
+    currentInvoices,
     markedEttns,
     isLoading,
     actionLoadingEttn,
@@ -82,11 +86,15 @@ export default function HomePage() {
         {/* Comparison KPI Statistics Cards */}
         <SummaryKpiCards data={data} />
 
-        {/* Data Grid Component */}
+        {/* Data Grid Component with Tabs */}
         <MissingInvoiceGrid
-          invoices={invoices}
+          invoices={currentInvoices}
           markedEttns={markedEttns}
           actionLoadingEttn={actionLoadingEttn}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          missingCount={missingInvoices.length}
+          matchedCount={matchedInvoices.length}
           onOpenPdf={openPdfViewer}
           onMarkAsUnread={handleMarkAsUnread}
         />

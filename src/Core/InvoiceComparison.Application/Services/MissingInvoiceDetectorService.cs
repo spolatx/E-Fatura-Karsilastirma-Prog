@@ -1,5 +1,6 @@
 using InvoiceComparison.Application.DTOs;
 using InvoiceComparison.Application.Interfaces;
+using InvoiceComparison.Domain.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace InvoiceComparison.Application.Services;
@@ -82,28 +83,42 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
             existingFicheNos.Count);
 
         // 2. e-Logo'dan gelen faturaları filtrele (Hem ETTN hem Fatura No ile çift anahtarlı kıyasla)
-        var missingInvoices = eLogoInvoices.Where(eLogoInv =>
+        var missingInvoices = new List<InvoiceSummary>();
+        var matchedInvoices = new List<InvoiceSummary>();
+
+        foreach (var eLogoInv in eLogoInvoices)
+        {
+            var eLogoEttn = eLogoInv.Ettn?.Trim().Trim('{', '}').ToUpperInvariant() ?? string.Empty;
+            var eLogoFicheNo = eLogoInv.InvoiceNumber?.Trim().ToUpperInvariant() ?? string.Empty;
+
+            var existsInLogo = (!string.IsNullOrWhiteSpace(eLogoEttn) && existingEttns.Contains(eLogoEttn)) ||
+                               (!string.IsNullOrWhiteSpace(eLogoFicheNo) && existingFicheNos.Contains(eLogoFicheNo));
+
+            if (existsInLogo)
             {
-                var eLogoEttn = eLogoInv.Ettn?.Trim().Trim('{', '}').ToUpperInvariant() ?? string.Empty;
-                var eLogoFicheNo = eLogoInv.InvoiceNumber?.Trim().ToUpperInvariant() ?? string.Empty;
+                matchedInvoices.Add(eLogoInv);
+            }
+            else
+            {
+                missingInvoices.Add(eLogoInv);
+            }
+        }
 
-                // Fatura ETTN'si VEYA Fatura Numarası Logo'da varsa bu fatura EKSİK DEĞİLDİR (false döner, elenir)
-                var existsInLogo = (!string.IsNullOrWhiteSpace(eLogoEttn) && existingEttns.Contains(eLogoEttn)) ||
-                                   (!string.IsNullOrWhiteSpace(eLogoFicheNo) && existingFicheNos.Contains(eLogoFicheNo));
-
-                return !existsInLogo;
-            })
+        missingInvoices = missingInvoices
             .OrderByDescending(x => x.IssueDate)
             .ThenBy(x => x.InvoiceNumber, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var matchedCount = eLogoInvoices.Count - missingInvoices.Count;
+        matchedInvoices = matchedInvoices
+            .OrderByDescending(x => x.IssueDate)
+            .ThenBy(x => x.InvoiceNumber, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         _logger.LogInformation(
             "Comparison completed for Company '{CompanyId}'. eLogo Count: {TotalCount}, Matched in Logo ERP: {MatchedCount}, Missing in Logo ERP: {MissingCount}.",
             request.CompanyId,
             eLogoInvoices.Count,
-            matchedCount,
+            matchedInvoices.Count,
             missingInvoices.Count);
 
         return new MissingInvoicesResponse
@@ -111,9 +126,10 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
             StartDate = normalizedStartDate,
             EndDate = normalizedEndDate,
             TotalIntegratorInvoicesCount = eLogoInvoices.Count,
-            TotalErpMatchedCount = matchedCount,
+            TotalErpMatchedCount = matchedInvoices.Count,
             MissingInvoicesCount = missingInvoices.Count,
-            MissingInvoices = missingInvoices
+            MissingInvoices = missingInvoices,
+            MatchedInvoices = matchedInvoices
         };
     }
 

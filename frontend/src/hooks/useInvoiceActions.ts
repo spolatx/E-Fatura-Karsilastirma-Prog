@@ -20,7 +20,7 @@ export function useInvoiceActions() {
   const [isCompaniesLoading, setIsCompaniesLoading] = useState<boolean>(true);
 
   const [data, setData] = useState<MissingInvoicesResponse | null>(null);
-  const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
+  const [activeTab, setActiveTab] = useState<'missing' | 'matched'>('missing');
   const [markedEttns, setMarkedEttns] = useState<Set<string>>(new Set());
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -93,7 +93,6 @@ export function useInvoiceActions() {
       try {
         const result = await fetchMissingInvoices(companyId, startDate, endDate);
         setData(result);
-        setInvoices(result.missingInvoices);
         setMarkedEttns(new Set());
 
         if (result.missingInvoices.length === 0) {
@@ -105,7 +104,7 @@ export function useInvoiceActions() {
         } else {
           addToast(
             'Karşılaştırma Tamamlandı',
-            `${result.missingInvoices.length} adet eksik fatura tespit edildi.`,
+            `${result.missingInvoices.length} adet eksik, ${result.matchedInvoices?.length || 0} adet eşleşen fatura tespit edildi.`,
             'info'
           );
         }
@@ -197,7 +196,11 @@ export function useInvoiceActions() {
     setSelectedCompanyId,
     isCompaniesLoading,
     data,
-    invoices,
+    activeTab,
+    setActiveTab,
+    missingInvoices: data?.missingInvoices || [],
+    matchedInvoices: data?.matchedInvoices || [],
+    currentInvoices: activeTab === 'missing' ? (data?.missingInvoices || []) : (data?.matchedInvoices || []),
     markedEttns,
     isLoading,
     actionLoadingEttn,
