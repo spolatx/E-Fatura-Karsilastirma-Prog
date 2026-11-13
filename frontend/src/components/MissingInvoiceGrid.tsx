@@ -118,18 +118,18 @@ export function MissingInvoiceGrid({
       </div>
 
       {/* Table Container */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto w-full">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider">
-              <th className="py-3 px-4">
+              <th className="py-3 px-4 whitespace-nowrap min-w-[130px]">
                 <button
                   type="button"
                   onClick={toggleSort}
                   className="inline-flex items-center gap-1.5 font-semibold uppercase hover:text-blue-600 cursor-pointer"
                   title="Fatura Kesim Tarihine (Issue Date) göre sırala"
                 >
-                  <span>Kesim Tarihi (Issue Date)</span>
+                  <span>Kesim Tarihi</span>
                   {sortDirection === 'desc' ? (
                     <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
                   ) : (
@@ -137,14 +137,14 @@ export function MissingInvoiceGrid({
                   )}
                 </button>
               </th>
-              <th className="py-3 px-4">Fatura No</th>
-              <th className="py-3 px-4">Gönderen Unvan</th>
-              <th className="py-3 px-4">VKN / TCKN</th>
-              <th className="py-3 px-4 text-right">Tutar</th>
-              <th className="py-3 px-4">Para Birimi</th>
-              <th className="py-3 px-4">ETTN (UUID)</th>
-              <th className="py-3 px-4 text-center">Durum</th>
-              <th className="py-3 px-4 text-right">Aksiyonlar</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[140px]">Fatura No</th>
+              <th className="py-3 px-4 min-w-[250px]">Gönderen Unvan</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[110px]">VKN / TCKN</th>
+              <th className="py-3 px-4 text-right whitespace-nowrap min-w-[110px]">Tutar</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[80px]">Para Birimi</th>
+              <th className="py-3 px-4 min-w-[160px] max-w-[200px]">ETTN (UUID)</th>
+              <th className="py-3 px-4 text-center whitespace-nowrap min-w-[110px]">Durum</th>
+              <th className="py-3 px-4 text-right whitespace-nowrap min-w-[250px]">Aksiyonlar</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -190,7 +190,7 @@ export function MissingInvoiceGrid({
                     </td>
 
                     {/* Sender Title */}
-                    <td className="py-3.5 px-4 text-slate-800 font-medium max-w-xs truncate" title={inv.senderTitle}>
+                    <td className="py-3.5 px-4 text-slate-800 font-medium min-w-[250px] max-w-md truncate" title={inv.senderTitle}>
                       {inv.senderTitle || '-'}
                     </td>
 
@@ -212,16 +212,16 @@ export function MissingInvoiceGrid({
                     </td>
 
                     {/* ETTN */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
-                        <span title={inv.ettn}>
-                          {inv.ettn.substring(0, 8)}...{inv.ettn.substring(inv.ettn.length - 4)}
+                    <td className="py-3.5 px-4 min-w-[160px] max-w-[200px]">
+                      <div className="flex items-center gap-1 font-mono text-[11px] text-slate-500">
+                        <span className="truncate" title={inv.ettn}>
+                          {inv.ettn}
                         </span>
                         <button
                           type="button"
                           onClick={() => copyToClipboard(inv.ettn)}
                           title="ETTN Kopyala"
-                          className="p-1 hover:text-slate-900 text-slate-400 rounded transition-colors"
+                          className="shrink-0 p-1 hover:text-slate-900 text-slate-400 rounded transition-colors cursor-pointer"
                         >
                           {copiedEttn === inv.ettn ? (
                             <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
@@ -247,16 +247,16 @@ export function MissingInvoiceGrid({
                     </td>
 
                     {/* Row Actions */}
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-2">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[250px]">
+                      <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
                         {/* View PDF Button */}
                         <button
                           type="button"
                           onClick={() => onOpenPdf(inv)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 active:bg-slate-100 rounded-md shadow-2xs transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 active:bg-slate-100 rounded-md shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                           title="Fatura PDF belgesini modal pencerede incele"
                         >
-                          <FileSearch className="w-3.5 h-3.5 text-blue-600" />
+                          <FileSearch className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                           <span>İncele (PDF)</span>
                         </button>
 
@@ -265,7 +265,7 @@ export function MissingInvoiceGrid({
                           type="button"
                           disabled={isMarked || isActionLoading}
                           onClick={() => onMarkAsUnread(inv)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-md shadow-2xs transition-all cursor-pointer ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-md shadow-2xs transition-all cursor-pointer whitespace-nowrap ${
                             isMarked
                               ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
                               : 'text-amber-800 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 border border-amber-300'
@@ -273,9 +273,9 @@ export function MissingInvoiceGrid({
                           title="Entegratör üzerinde faturayı 'Alınmadı' statüsüne çekerek ERP gelen kutusuna düşürür"
                         >
                           {isActionLoading ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
                           ) : (
-                            <Inbox className="w-3.5 h-3.5 text-amber-700" />
+                            <Inbox className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                           )}
                           <span>
                             {isMarked ? 'İşlendi' : 'Alınmadı Olarak İşaretle'}
