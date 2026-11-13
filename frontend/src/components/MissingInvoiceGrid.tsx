@@ -8,8 +8,10 @@ import {
   Search,
   CheckCircle,
   Copy,
-  ExternalLink,
   Loader2,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
 } from 'lucide-react';
 
 interface MissingInvoiceGridProps {
@@ -29,19 +31,34 @@ export function MissingInvoiceGrid({
 }: MissingInvoiceGridProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedEttn, setCopiedEttn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'desc' | 'asc'>('desc');
+
+  const toggleSort = () => {
+    setSortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+  };
 
   const filteredInvoices = useMemo(() => {
-    if (!searchTerm.trim()) return invoices;
-    const term = searchTerm.toLowerCase();
+    let list = invoices;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter(
+        (inv) =>
+          inv.invoiceNumber?.toLowerCase().includes(term) ||
+          inv.senderTitle?.toLowerCase().includes(term) ||
+          inv.senderTaxNumber?.toLowerCase().includes(term) ||
+          inv.ettn?.toLowerCase().includes(term)
+      );
+    }
 
-    return invoices.filter(
-      (inv) =>
-        inv.invoiceNumber?.toLowerCase().includes(term) ||
-        inv.senderTitle?.toLowerCase().includes(term) ||
-        inv.senderTaxNumber?.toLowerCase().includes(term) ||
-        inv.ettn?.toLowerCase().includes(term)
-    );
-  }, [invoices, searchTerm]);
+    return [...list].sort((a, b) => {
+      const timeA = new Date(a.issueDate).getTime() || 0;
+      const timeB = new Date(b.issueDate).getTime() || 0;
+      if (timeA !== timeB) {
+        return sortDirection === 'desc' ? timeB - timeA : timeA - timeB;
+      }
+      return (a.invoiceNumber || '').localeCompare(b.invoiceNumber || '', undefined, { sensitivity: 'base' });
+    });
+  }, [invoices, searchTerm, sortDirection]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -84,7 +101,7 @@ export function MissingInvoiceGrid({
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            eLogo entegratöründe mevcut olup yerel Logo ERP veritabanında kaydı bulunmayan faturalar listelenir.
+            Faturalar kesim tarihine göre en yeniden eskiye doğru sıralanmaktadır.
           </p>
         </div>
 
@@ -106,7 +123,21 @@ export function MissingInvoiceGrid({
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider">
-              <th className="py-3 px-4">Tarih</th>
+              <th className="py-3 px-4">
+                <button
+                  type="button"
+                  onClick={toggleSort}
+                  className="inline-flex items-center gap-1 font-semibold uppercase hover:text-blue-600 cursor-pointer"
+                  title="Kesim Tarihine göre sırala"
+                >
+                  <span>Kesim Tarihi</span>
+                  {sortDirection === 'desc' ? (
+                    <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                  ) : (
+                    <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                  )}
+                </button>
+              </th>
               <th className="py-3 px-4">Fatura No</th>
               <th className="py-3 px-4">Gönderen Unvan</th>
               <th className="py-3 px-4">VKN / TCKN</th>
@@ -144,8 +175,8 @@ export function MissingInvoiceGrid({
                       isMarked ? 'bg-emerald-50/40 hover:bg-emerald-50/60' : ''
                     }`}
                   >
-                    {/* Date */}
-                    <td className="py-3.5 px-4 font-medium text-slate-800 whitespace-nowrap">
+                    {/* Issue Date */}
+                    <td className="py-3.5 px-4 font-semibold text-slate-800 whitespace-nowrap">
                       {formatDate(inv.issueDate)}
                     </td>
 
@@ -260,4 +291,3 @@ export function MissingInvoiceGrid({
     </div>
   );
 }
-
