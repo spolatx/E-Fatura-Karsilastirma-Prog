@@ -63,13 +63,19 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
         var eLogoInvoices = await eLogoInvoicesTask.ConfigureAwait(false);
         var rawLogoEttns = await logoEttnsTask.ConfigureAwait(false);
 
-        // Ensure case-insensitive HashSet comparison
-        var logoEttns = new HashSet<string>(
-            rawLogoEttns.Where(ettn => !string.IsNullOrWhiteSpace(ettn)).Select(ettn => ettn.Trim()),
+        // Logo ERP'deki mevcut ETTN'leri temizleyerek HashSet'e at (Performans ve Case-Insensitive arama için)
+        var logoEttnSet = new HashSet<string>(
+            rawLogoEttns.Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e.Trim().Trim('{', '}')),
             StringComparer.OrdinalIgnoreCase);
 
+        _logger.LogInformation(
+            "Company '{CompanyId}' comparison input: eLogo invoices count = {ELogoCount}, Logo ERP unique ETTNs count = {LogoCount}.",
+            request.CompanyId,
+            eLogoInvoices.Count,
+            logoEttnSet.Count);
+
         var missingInvoices = eLogoInvoices
-            .Where(x => !string.IsNullOrWhiteSpace(x.Ettn) && !logoEttns.Contains(x.Ettn.Trim()))
+            .Where(inv => !string.IsNullOrWhiteSpace(inv.Ettn) && !logoEttnSet.Contains(inv.Ettn.Trim().Trim('{', '}')))
             .OrderByDescending(x => x.IssueDate)
             .ThenBy(x => x.InvoiceNumber, StringComparer.OrdinalIgnoreCase)
             .ToList();
