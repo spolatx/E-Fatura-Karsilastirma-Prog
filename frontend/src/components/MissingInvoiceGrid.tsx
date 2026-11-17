@@ -19,6 +19,7 @@ interface MissingInvoiceGridProps {
   actionLoadingEttn: string | null;
   activeTab: 'missing' | 'matched';
   onTabChange: (tab: 'missing' | 'matched') => void;
+  direction?: 'purchase' | 'sales';
   missingCount: number;
   matchedCount: number;
   onOpenPdf: (invoice: InvoiceSummary) => void;
@@ -31,11 +32,13 @@ export function MissingInvoiceGrid({
   actionLoadingEttn,
   activeTab,
   onTabChange,
+  direction = 'purchase',
   missingCount,
   matchedCount,
   onOpenPdf,
   onMarkAsUnread,
 }: MissingInvoiceGridProps) {
+  const isSales = direction === 'sales';
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedEttn, setCopiedEttn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'desc' | 'asc'>('desc');
@@ -148,9 +151,13 @@ export function MissingInvoiceGrid({
         <div>
           <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
             <span>
-              {activeTab === 'missing'
-                ? "Logo ERP'de Eksik Faturalar"
-                : "Logo ERP'de Eşleşen Faturalar"}
+              {isSales
+                ? activeTab === 'missing'
+                  ? "Satış (Giden) - Logo'da Eksik Faturalar"
+                  : "Satış (Giden) - Logo'da Eşleşen Faturalar"
+                : activeTab === 'missing'
+                  ? "Satın Alma (Gelen) - Logo'da Eksik Faturalar"
+                  : "Satın Alma (Gelen) - Logo'da Eşleşen Faturalar"}
             </span>
             <span
               className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -163,7 +170,9 @@ export function MissingInvoiceGrid({
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Faturalar kesim tarihine (Issue Date) göre en yeniden eskiye doğru sıralanmaktadır.
+            {isSales
+              ? "e-Logo Giden (Outbox) faturaları Logo ERP satış faturalarıyla karşılaştırılmaktadır."
+              : "e-Logo Gelen (Inbox) faturaları Logo ERP satın alma faturalarıyla karşılaştırılmaktadır."}
           </p>
         </div>
 
@@ -201,7 +210,9 @@ export function MissingInvoiceGrid({
                 </button>
               </th>
               <th className="py-3 px-4 whitespace-nowrap min-w-[140px]">Fatura No</th>
-              <th className="py-3 px-4 min-w-[250px]">Gönderen Unvan</th>
+              <th className="py-3 px-4 min-w-[250px]">
+                {isSales ? 'Müşteri Unvan' : 'Gönderen / Tedarikçi Unvan'}
+              </th>
               <th className="py-3 px-4 whitespace-nowrap min-w-[110px]">VKN / TCKN</th>
               <th className="py-3 px-4 text-right whitespace-nowrap min-w-[110px]">Tutar</th>
               <th className="py-3 px-4 whitespace-nowrap min-w-[80px]">Para Birimi</th>

@@ -1,4 +1,5 @@
 using InvoiceComparison.Domain.Entities;
+using InvoiceComparison.Domain.Enums;
 
 namespace InvoiceComparison.Application.Interfaces;
 
@@ -8,6 +9,7 @@ public interface IELogoIntegrationService
         string companyId,
         DateTime startDate,
         DateTime endDate,
+        InvoiceDirection direction = InvoiceDirection.Purchase,
         CancellationToken cancellationToken = default);
 
     Task<byte[]> GetInvoicePdfAsync(

@@ -1,4 +1,5 @@
 using InvoiceComparison.Domain.Entities;
+using InvoiceComparison.Domain.Enums;
 
 namespace InvoiceComparison.Application.DTOs;
 
@@ -6,6 +7,7 @@ public sealed record MissingInvoicesResponse
 {
     public required DateTime StartDate { get; init; }
     public required DateTime EndDate { get; init; }
+    public InvoiceDirection Direction { get; init; } = InvoiceDirection.Purchase;
     public required int TotalIntegratorInvoicesCount { get; init; }
     public required int TotalErpMatchedCount { get; init; }
     public required int MissingInvoicesCount { get; init; }

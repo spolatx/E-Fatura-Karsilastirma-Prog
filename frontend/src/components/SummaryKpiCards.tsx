@@ -6,10 +6,13 @@ import { CheckCircle2, AlertTriangle, FileText, Banknote } from 'lucide-react';
 
 interface SummaryKpiCardsProps {
   data: MissingInvoicesResponse | null;
+  direction?: 'purchase' | 'sales';
 }
 
-export function SummaryKpiCards({ data }: SummaryKpiCardsProps) {
+export function SummaryKpiCards({ data, direction = 'purchase' }: SummaryKpiCardsProps) {
   if (!data) return null;
+
+  const isSales = direction === 'sales' || data.direction === 'sales';
 
   const totalMissingAmount = data.missingInvoices.reduce(
     (sum, inv) => sum + (inv.payableAmount || 0),
@@ -33,7 +36,7 @@ export function SummaryKpiCards({ data }: SummaryKpiCardsProps) {
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            eLogo Gelen Fatura
+            {isSales ? 'eLogo Giden Fatura' : 'eLogo Gelen Fatura'}
           </p>
           <p className="text-2xl font-bold text-slate-800">
             {data.totalIntegratorInvoicesCount}

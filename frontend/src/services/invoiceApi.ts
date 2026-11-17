@@ -1,5 +1,6 @@
 import {
   CompanyItem,
+  InvoiceDirection,
   MarkInvoiceUnreadResponse,
   MissingInvoicesResponse,
   ProblemDetails,
@@ -34,13 +35,13 @@ export async function fetchCompanies(
   return response.json();
 }
 
-export async function fetchMissingInvoices(
+export async function fetchPurchaseInvoices(
   companyId: string,
   startDate: string,
   endDate: string,
   signal?: AbortSignal
 ): Promise<MissingInvoicesResponse> {
-  const url = `${API_BASE_URL}/api/invoices/missing?companyId=${encodeURIComponent(
+  const url = `${API_BASE_URL}/api/invoices/purchase?companyId=${encodeURIComponent(
     companyId
   )}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(
     endDate
@@ -64,6 +65,51 @@ export async function fetchMissingInvoices(
   }
 
   return response.json();
+}
+
+export async function fetchSalesInvoices(
+  companyId: string,
+  startDate: string,
+  endDate: string,
+  signal?: AbortSignal
+): Promise<MissingInvoicesResponse> {
+  const url = `${API_BASE_URL}/api/invoices/sales?companyId=${encodeURIComponent(
+    companyId
+  )}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(
+    endDate
+  )}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => null)) as ProblemDetails | null;
+    const errorMessage =
+      errorBody?.detail ||
+      errorBody?.title ||
+      `Server error: ${response.status} ${response.statusText}`;
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+export async function fetchMissingInvoices(
+  companyId: string,
+  startDate: string,
+  endDate: string,
+  direction: InvoiceDirection = 'purchase',
+  signal?: AbortSignal
+): Promise<MissingInvoicesResponse> {
+  if (direction === 'sales') {
+    return fetchSalesInvoices(companyId, startDate, endDate, signal);
+  }
+  return fetchPurchaseInvoices(companyId, startDate, endDate, signal);
 }
 
 export async function fetchInvoicePdfBlob(

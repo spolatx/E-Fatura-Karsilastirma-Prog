@@ -37,6 +37,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
         string companyId,
         DateTime startDate,
         DateTime endDate,
+        InvoiceDirection direction = InvoiceDirection.Purchase,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(companyId);
@@ -50,17 +51,21 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
             sessionID = await LoginAsync(client, company.ELogoUserName, company.ELogoPassword, cancellationToken).ConfigureAwait(false);
 
             var documentType = string.IsNullOrWhiteSpace(_options.DocumentType) ? "EINVOICE" : _options.DocumentType;
+            // OPTYPE: 1 = Sent (Giden / OUTBOX / Sales), 2 = Received (Gelen / INBOX / Purchase)
+            var opType = direction == InvoiceDirection.Sales ? "1" : "2";
+
             var paramList = new[]
             {
                 $"DOCUMENTTYPE={documentType}",
                 $"BEGINDATE={startDate:yyyy-MM-dd}",
                 $"ENDDATE={endDate:yyyy-MM-dd}",
-                "OPTYPE=2", // 2 = Received (Gelen / INBOX)
+                $"OPTYPE={opType}",
                 "DATEBY=0"  // 0 = Belge Tarihi (Issue Date)
             };
 
             _logger.LogInformation(
-                "Calling eLogo WCF GetDocumentList for Company '{CompanyId}' ({UserName}) between {StartDate:yyyy-MM-dd} and {EndDate:yyyy-MM-dd}.",
+                "Calling eLogo WCF GetDocumentList ({Direction}) for Company '{CompanyId}' ({UserName}) between {StartDate:yyyy-MM-dd} and {EndDate:yyyy-MM-dd}.",
+                direction,
                 company.Id,
                 company.ELogoUserName,
                 startDate,
@@ -71,7 +76,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
 
             if (response?.docList is null || response.docList.Length == 0)
             {
-                _logger.LogInformation("No incoming e-Invoices found on eLogo in the requested date range for company '{CompanyId}'.", company.Id);
+                _logger.LogInformation("No {Direction} e-Invoices found on eLogo in the requested date range for company '{CompanyId}'.", direction, company.Id);
                 return [];
             }
 
@@ -94,7 +99,7 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
 
                     if (summary is not null)
                     {
-                        invoices.Add(summary);
+                        invoices.Add(summary with { Direction = direction });
                     }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -106,16 +111,17 @@ public sealed class ELogoIntegrationService : IELogoIntegrationService
                         Ettn = ettn,
                         InvoiceNumber = doc.documentId ?? string.Empty,
                         SenderTaxNumber = string.Empty,
-                        SenderTitle = "e-Fatura",
+                        SenderTitle = direction == InvoiceDirection.Sales ? "Satış Faturası" : "e-Fatura",
                         IssueDate = startDate,
                         PayableAmount = 0m,
                         CurrencyCode = "TRY",
+                        Direction = direction,
                         IntegrationStatus = InvoiceIntegrationStatus.ReadByErp
                     });
                 }
             }
 
-            _logger.LogInformation("Successfully retrieved {Count} incoming e-Invoices from eLogo WCF for company '{CompanyId}'.", invoices.Count, company.Id);
+            _logger.LogInformation("Successfully retrieved {Count} {Direction} e-Invoices from eLogo WCF for company '{CompanyId}'.", invoices.Count, direction, company.Id);
             return invoices;
         }
         catch (FaultException ex)

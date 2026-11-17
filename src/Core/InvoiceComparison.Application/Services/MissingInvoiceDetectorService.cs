@@ -1,6 +1,7 @@
 using InvoiceComparison.Application.DTOs;
 using InvoiceComparison.Application.Interfaces;
 using InvoiceComparison.Domain.Entities;
+using InvoiceComparison.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace InvoiceComparison.Application.Services;
@@ -41,23 +42,24 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
         var normalizedEndDate = request.EndDate.Date.AddDays(1).AddTicks(-1);
 
         _logger.LogInformation(
-            "Starting missing invoice detection for Company '{CompanyId}' between {StartDate:yyyy-MM-dd} and {EndDate:yyyy-MM-dd}.",
+            "Starting {Direction} invoice detection for Company '{CompanyId}' between {StartDate:yyyy-MM-dd} and {EndDate:yyyy-MM-dd}.",
+            request.Direction,
             request.CompanyId,
             normalizedStartDate,
             normalizedEndDate);
 
-        // Execute integrator API call and local ERP SQL query concurrently with companyId
+        // Execute integrator API call (Inbox for Purchase, Outbox for Sales)
+        // and local ERP SQL query (GetPurchaseInvoicesAsync or GetSalesInvoicesAsync) concurrently
         var eLogoInvoicesTask = _eLogoIntegrationService.GetInvoicesAsync(
             request.CompanyId,
             normalizedStartDate,
             normalizedEndDate,
+            request.Direction,
             cancellationToken);
 
-        var logoInvoicesTask = _logoDatabaseRepository.GetExistingInvoicesAsync(
-            request.CompanyId,
-            normalizedStartDate,
-            normalizedEndDate,
-            cancellationToken);
+        var logoInvoicesTask = request.Direction == InvoiceDirection.Sales
+            ? _logoDatabaseRepository.GetSalesInvoicesAsync(request.CompanyId, normalizedStartDate, normalizedEndDate, cancellationToken)
+            : _logoDatabaseRepository.GetPurchaseInvoicesAsync(request.CompanyId, normalizedStartDate, normalizedEndDate, cancellationToken);
 
         await Task.WhenAll(eLogoInvoicesTask, logoInvoicesTask).ConfigureAwait(false);
 
@@ -76,8 +78,9 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
         );
 
         _logger.LogInformation(
-            "Company '{CompanyId}' comparison input: eLogo invoices count = {ELogoCount}, Logo ERP unique ETTNs = {EttnCount}, unique FicheNos = {FicheCount}.",
+            "Company '{CompanyId}' ({Direction}) comparison input: eLogo invoices count = {ELogoCount}, Logo ERP unique ETTNs = {EttnCount}, unique FicheNos = {FicheCount}.",
             request.CompanyId,
+            request.Direction,
             eLogoInvoices.Count,
             existingEttns.Count,
             existingFicheNos.Count);
@@ -115,8 +118,9 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
             .ToList();
 
         _logger.LogInformation(
-            "Comparison completed for Company '{CompanyId}'. eLogo Count: {TotalCount}, Matched in Logo ERP: {MatchedCount}, Missing in Logo ERP: {MissingCount}.",
+            "Comparison completed for Company '{CompanyId}' ({Direction}). eLogo Count: {TotalCount}, Matched in Logo ERP: {MatchedCount}, Missing in Logo ERP: {MissingCount}.",
             request.CompanyId,
+            request.Direction,
             eLogoInvoices.Count,
             matchedInvoices.Count,
             missingInvoices.Count);
@@ -125,6 +129,7 @@ public sealed class MissingInvoiceDetectorService : IMissingInvoiceDetectorServi
         {
             StartDate = normalizedStartDate,
             EndDate = normalizedEndDate,
+            Direction = request.Direction,
             TotalIntegratorInvoicesCount = eLogoInvoices.Count,
             TotalErpMatchedCount = matchedInvoices.Count,
             MissingInvoicesCount = missingInvoices.Count,

@@ -22,8 +22,8 @@ public static class InvoiceEndpoints
         var group = app.MapGroup("/api/invoices")
             .WithTags("Invoices");
 
-        // GET /api/invoices/missing?companyId=firma1&startDate=2026-11-01&endDate=2026-11-10
-        group.MapGet("/missing", async (
+        // GET /api/invoices/purchase?companyId=firma1&startDate=2026-11-01&endDate=2026-11-10
+        group.MapGet("/purchase", async (
             [FromQuery] string companyId,
             [FromQuery] DateTime startDate,
             [FromQuery] DateTime endDate,
@@ -44,7 +44,89 @@ public static class InvoiceEndpoints
             {
                 CompanyId = companyId.Trim(),
                 StartDate = startDate,
-                EndDate = endDate
+                EndDate = endDate,
+                Direction = InvoiceComparison.Domain.Enums.InvoiceDirection.Purchase
+            };
+
+            var response = await detectorService
+                .DetectMissingInvoicesAsync(request, cancellationToken)
+                .ConfigureAwait(false);
+
+            return Results.Ok(response);
+        })
+        .WithName("GetPurchaseInvoices")
+        .Produces<MissingInvoicesResponse>(StatusCodes.Status200OK)
+        .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+        .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError)
+        .Produces<ProblemDetails>(StatusCodes.Status502BadGateway);
+
+        // GET /api/invoices/sales?companyId=firma1&startDate=2026-11-01&endDate=2026-11-10
+        group.MapGet("/sales", async (
+            [FromQuery] string companyId,
+            [FromQuery] DateTime startDate,
+            [FromQuery] DateTime endDate,
+            IMissingInvoiceDetectorService detectorService,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(companyId))
+            {
+                return Results.BadRequest(new ProblemDetails
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Title = "Missing Company",
+                    Detail = "Query parameter 'companyId' is required."
+                });
+            }
+
+            var request = new MissingInvoicesRequest
+            {
+                CompanyId = companyId.Trim(),
+                StartDate = startDate,
+                EndDate = endDate,
+                Direction = InvoiceComparison.Domain.Enums.InvoiceDirection.Sales
+            };
+
+            var response = await detectorService
+                .DetectMissingInvoicesAsync(request, cancellationToken)
+                .ConfigureAwait(false);
+
+            return Results.Ok(response);
+        })
+        .WithName("GetSalesInvoices")
+        .Produces<MissingInvoicesResponse>(StatusCodes.Status200OK)
+        .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+        .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError)
+        .Produces<ProblemDetails>(StatusCodes.Status502BadGateway);
+
+        // Legacy compatibility endpoint: GET /api/invoices/missing
+        group.MapGet("/missing", async (
+            [FromQuery] string companyId,
+            [FromQuery] DateTime startDate,
+            [FromQuery] DateTime endDate,
+            [FromQuery] string? direction,
+            IMissingInvoiceDetectorService detectorService,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(companyId))
+            {
+                return Results.BadRequest(new ProblemDetails
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Title = "Missing Company",
+                    Detail = "Query parameter 'companyId' is required."
+                });
+            }
+
+            var dir = string.Equals(direction, "sales", StringComparison.OrdinalIgnoreCase)
+                ? InvoiceComparison.Domain.Enums.InvoiceDirection.Sales
+                : InvoiceComparison.Domain.Enums.InvoiceDirection.Purchase;
+
+            var request = new MissingInvoicesRequest
+            {
+                CompanyId = companyId.Trim(),
+                StartDate = startDate,
+                EndDate = endDate,
+                Direction = dir
             };
 
             var response = await detectorService

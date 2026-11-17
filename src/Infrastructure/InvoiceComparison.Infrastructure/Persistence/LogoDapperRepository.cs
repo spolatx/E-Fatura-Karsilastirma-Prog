@@ -34,7 +34,7 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
             : configuration.GetConnectionString("LogoDatabase") ?? string.Empty;
     }
 
-    public async Task<IReadOnlyList<InvoiceIdentityDto>> GetExistingInvoicesAsync(
+    public async Task<IReadOnlyList<InvoiceIdentityDto>> GetPurchaseInvoicesAsync(
         string companyId,
         DateTime startDate,
         DateTime endDate,
@@ -46,50 +46,31 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
         {
             throw new LogoDbException(
                 "Logo ERP SQL Server connection string is not configured (Check 'ConnectionStrings:LogoDatabase').",
-                databaseOperation: nameof(GetExistingInvoicesAsync));
+                databaseOperation: nameof(GetPurchaseInvoicesAsync));
         }
 
         var company = _companyConfigService.GetCompany(companyId);
         ValidateTableIdentifiers(company.LogoFirmNumber, company.LogoPeriodNumber);
 
-        var stficheTableName = $"LG_{company.LogoFirmNumber}_{company.LogoPeriodNumber}_STFICHE";
         var invoiceTableName = $"LG_{company.LogoFirmNumber}_{company.LogoPeriodNumber}_INVOICE";
+        var clcardTableName = $"LG_{company.LogoFirmNumber}_CLCARD";
 
-        // Queries both FICHENO and TRACKNR (ETTN) from LG_XXX_XX_STFICHE and LG_XXX_XX_INVOICE
-        // filters for incoming invoice TRCODEs (1=Satınalma, 2=Perakende İade, 3=Toptan Satış İade, 4=Alınan Hizmet, 13=Fiyat Farkı, 14=Alınan Hizmet vb.)
-        // filtering by official issue date (DATE_) and ordered by DATE_ DESC, TIME_ DESC
-        // and WITH (NOLOCK) so active Logo transactions are never blocked.
+        // Satın alma (Gelen) faturaları: TRCODE IN (1, 2, 3, 4, 13)
+        // Join with CLCARD to get supplier details (TAXNR/TCKNO, TITLE)
         var sql = $"""
             SELECT 
-                LTRIM(RTRIM(T.[FicheNo])) AS FicheNo,
-                LTRIM(RTRIM(T.[Ettn])) AS Ettn
-            FROM
-            (
-                SELECT 
-                    STF.[FICHENO] AS FicheNo,
-                    STF.[TRACKNR] AS Ettn,
-                    STF.[DATE_] AS InvoiceDate,
-                    STF.[FTIME] AS InvoiceTime
-                FROM [{stficheTableName}] AS STF WITH (NOLOCK)
-                WHERE STF.[CANCELLED] = 0
-                  AND STF.[DATE_] >= @StartDate
-                  AND STF.[DATE_] <= @EndDate
-                  AND STF.[TRCODE] IN (1, 2, 3, 4, 13, 14, 26)
-
-                UNION ALL
-
-                SELECT 
-                    INV.[FICHENO] AS FicheNo,
-                    INV.[TRACKNR] AS Ettn,
-                    INV.[DATE_] AS InvoiceDate,
-                    INV.[TIME_] AS InvoiceTime
-                FROM [{invoiceTableName}] AS INV WITH (NOLOCK)
-                WHERE INV.[CANCELLED] = 0
-                  AND INV.[DATE_] >= @StartDate
-                  AND INV.[DATE_] <= @EndDate
-                  AND INV.[TRCODE] IN (1, 2, 3, 4, 13, 14, 26)
-            ) AS T
-            ORDER BY T.[InvoiceDate] DESC, T.[InvoiceTime] DESC;
+                LTRIM(RTRIM(INV.[FICHENO])) AS FicheNo,
+                LTRIM(RTRIM(INV.[TRACKNR])) AS Ettn,
+                LTRIM(RTRIM(COALESCE(NULLIF(CLC.[TAXNR], ''), CLC.[TCKNO]))) AS TaxNumber,
+                LTRIM(RTRIM(CLC.[DEFINITION_])) AS ClientTitle,
+                CAST(INV.[EINVOICE] AS INT) AS EInvoiceType
+            FROM [{invoiceTableName}] AS INV WITH (NOLOCK)
+            LEFT JOIN [{clcardTableName}] AS CLC WITH (NOLOCK) ON CLC.[LOGICALREF] = INV.[CLIENTREF]
+            WHERE INV.[CANCELLED] = 0
+              AND INV.[DATE_] >= @StartDate
+              AND INV.[DATE_] <= @EndDate
+              AND INV.[TRCODE] IN (1, 2, 3, 4, 13)
+            ORDER BY INV.[DATE_] DESC, INV.[TIME_] DESC;
             """;
 
         try
@@ -110,9 +91,8 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
             var invoices = (await connection.QueryAsync<InvoiceIdentityDto>(command).ConfigureAwait(false)).ToList();
 
             _logger.LogInformation(
-                "Retrieved {Count} distinct invoices from Logo ERP tables [{StficheTable}] / [{InvoiceTable}] for company '{CompanyId}' ({Range}).",
+                "Retrieved {Count} purchase invoices from Logo ERP [{InvoiceTable}] for company '{CompanyId}' ({Range}).",
                 invoices.Count,
-                stficheTableName,
                 invoiceTableName,
                 companyId,
                 $"{startDate:yyyy-MM-dd} - {endDate:yyyy-MM-dd}");
@@ -123,25 +103,115 @@ public sealed partial class LogoDapperRepository : ILogoDatabaseRepository
         {
             _logger.LogError(
                 ex,
-                "SQL error #{SqlErrorNumber} occurred while querying Logo ERP tables [{StficheTable}] / [{InvoiceTable}] for company '{CompanyId}'.",
+                "SQL error #{SqlErrorNumber} occurred while querying purchase invoices from Logo ERP [{InvoiceTable}] for company '{CompanyId}'.",
                 ex.Number,
-                stficheTableName,
                 invoiceTableName,
                 companyId);
 
             throw new LogoDbException(
-                $"Database error occurred while reading invoices from Logo ERP: {ex.Message}",
-                databaseOperation: nameof(GetExistingInvoicesAsync),
+                $"Database error occurred while reading purchase invoices from Logo ERP: {ex.Message}",
+                databaseOperation: nameof(GetPurchaseInvoicesAsync),
                 sqlErrorNumber: ex.Number,
                 innerException: ex);
         }
         catch (Exception ex) when (ex is not LogoDbException and not OperationCanceledException)
         {
-            _logger.LogError(ex, "Unexpected error while querying Logo ERP database for company '{CompanyId}'.", companyId);
+            _logger.LogError(ex, "Unexpected error while querying purchase invoices from Logo ERP for company '{CompanyId}'.", companyId);
 
             throw new LogoDbException(
-                $"Unexpected database error while querying Logo ERP: {ex.Message}",
-                databaseOperation: nameof(GetExistingInvoicesAsync),
+                $"Unexpected database error while querying purchase invoices from Logo ERP: {ex.Message}",
+                databaseOperation: nameof(GetPurchaseInvoicesAsync),
+                innerException: ex);
+        }
+    }
+
+    public async Task<IReadOnlyList<InvoiceIdentityDto>> GetSalesInvoicesAsync(
+        string companyId,
+        DateTime startDate,
+        DateTime endDate,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyId);
+
+        if (string.IsNullOrWhiteSpace(_connectionString))
+        {
+            throw new LogoDbException(
+                "Logo ERP SQL Server connection string is not configured (Check 'ConnectionStrings:LogoDatabase').",
+                databaseOperation: nameof(GetSalesInvoicesAsync));
+        }
+
+        var company = _companyConfigService.GetCompany(companyId);
+        ValidateTableIdentifiers(company.LogoFirmNumber, company.LogoPeriodNumber);
+
+        var invoiceTableName = $"LG_{company.LogoFirmNumber}_{company.LogoPeriodNumber}_INVOICE";
+        var clcardTableName = $"LG_{company.LogoFirmNumber}_CLCARD";
+
+        // Satış (Giden) faturaları: TRCODE IN (6, 7, 8, 9, 14)
+        // Join with CLCARD to get customer details (TAXNR/TCKNO, TITLE) and EINVOICE (1: e-Fatura, 2: e-Arşiv)
+        var sql = $"""
+            SELECT 
+                LTRIM(RTRIM(INV.[FICHENO])) AS FicheNo,
+                LTRIM(RTRIM(INV.[TRACKNR])) AS Ettn,
+                LTRIM(RTRIM(COALESCE(NULLIF(CLC.[TAXNR], ''), CLC.[TCKNO]))) AS TaxNumber,
+                LTRIM(RTRIM(CLC.[DEFINITION_])) AS ClientTitle,
+                CAST(INV.[EINVOICE] AS INT) AS EInvoiceType
+            FROM [{invoiceTableName}] AS INV WITH (NOLOCK)
+            LEFT JOIN [{clcardTableName}] AS CLC WITH (NOLOCK) ON CLC.[LOGICALREF] = INV.[CLIENTREF]
+            WHERE INV.[CANCELLED] = 0
+              AND INV.[DATE_] >= @StartDate
+              AND INV.[DATE_] <= @EndDate
+              AND INV.[TRCODE] IN (6, 7, 8, 9, 14)
+            ORDER BY INV.[DATE_] DESC, INV.[TIME_] DESC;
+            """;
+
+        try
+        {
+            await using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            var command = new CommandDefinition(
+                commandText: sql,
+                parameters: new
+                {
+                    StartDate = startDate.Date,
+                    EndDate = endDate.Date.AddDays(1).AddTicks(-1)
+                },
+                commandTimeout: _options.CommandTimeoutSeconds,
+                cancellationToken: cancellationToken);
+
+            var invoices = (await connection.QueryAsync<InvoiceIdentityDto>(command).ConfigureAwait(false)).ToList();
+
+            _logger.LogInformation(
+                "Retrieved {Count} sales invoices from Logo ERP [{InvoiceTable}] for company '{CompanyId}' ({Range}).",
+                invoices.Count,
+                invoiceTableName,
+                companyId,
+                $"{startDate:yyyy-MM-dd} - {endDate:yyyy-MM-dd}");
+
+            return invoices;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(
+                ex,
+                "SQL error #{SqlErrorNumber} occurred while querying sales invoices from Logo ERP [{InvoiceTable}] for company '{CompanyId}'.",
+                ex.Number,
+                invoiceTableName,
+                companyId);
+
+            throw new LogoDbException(
+                $"Database error occurred while reading sales invoices from Logo ERP: {ex.Message}",
+                databaseOperation: nameof(GetSalesInvoicesAsync),
+                sqlErrorNumber: ex.Number,
+                innerException: ex);
+        }
+        catch (Exception ex) when (ex is not LogoDbException and not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Unexpected error while querying sales invoices from Logo ERP for company '{CompanyId}'.", companyId);
+
+            throw new LogoDbException(
+                $"Unexpected database error while querying sales invoices from Logo ERP: {ex.Message}",
+                databaseOperation: nameof(GetSalesInvoicesAsync),
                 innerException: ex);
         }
     }

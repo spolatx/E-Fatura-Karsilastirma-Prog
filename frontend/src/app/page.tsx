@@ -7,7 +7,7 @@ import { SummaryKpiCards } from '@/components/SummaryKpiCards';
 import { MissingInvoiceGrid } from '@/components/MissingInvoiceGrid';
 import { PdfViewerModal } from '@/components/PdfViewerModal';
 import { ToastNotification } from '@/components/ToastNotification';
-import { Layers, Database, ShieldCheck } from 'lucide-react';
+import { Layers, Database, ShieldCheck, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
 export default function HomePage() {
   const {
@@ -15,6 +15,8 @@ export default function HomePage() {
     selectedCompanyId,
     setSelectedCompanyId,
     isCompaniesLoading,
+    direction,
+    setDirection,
     data,
     activeTab,
     setActiveTab,
@@ -73,6 +75,35 @@ export default function HomePage() {
 
       {/* Main Content Dashboard */}
       <main className="flex-1 mx-auto max-w-[96%] w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Purchase / Sales Major Direction Switcher Tabs */}
+        <div className="flex items-center gap-3 bg-white p-2 rounded-xl border border-slate-200 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setDirection('purchase')}
+            className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-lg font-bold text-sm transition-all cursor-pointer ${
+              direction === 'purchase'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <ArrowDownLeft className={`w-4 h-4 ${direction === 'purchase' ? 'text-white' : 'text-blue-600'}`} />
+            <span>Satın Alma Faturaları (Gelen / Inbox)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDirection('sales')}
+            className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-lg font-bold text-sm transition-all cursor-pointer ${
+              direction === 'sales'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <ArrowUpRight className={`w-4 h-4 ${direction === 'sales' ? 'text-white' : 'text-indigo-600'}`} />
+            <span>Satış Faturaları (Giden / Outbox)</span>
+          </button>
+        </div>
+
         {/* Date Filter & Trigger Bar */}
         <DateFilterBar
           companies={companies}
@@ -84,7 +115,7 @@ export default function HomePage() {
         />
 
         {/* Comparison KPI Statistics Cards */}
-        <SummaryKpiCards data={data} />
+        <SummaryKpiCards data={data} direction={direction} />
 
         {/* Data Grid Component with Tabs */}
         <MissingInvoiceGrid
@@ -93,6 +124,7 @@ export default function HomePage() {
           actionLoadingEttn={actionLoadingEttn}
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          direction={direction}
           missingCount={missingInvoices.length}
           matchedCount={matchedInvoices.length}
           onOpenPdf={openPdfViewer}

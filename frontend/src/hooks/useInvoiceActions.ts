@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   CompanyItem,
+  InvoiceDirection,
   InvoiceSummary,
   MissingInvoicesResponse,
   ToastMessage,
@@ -19,6 +20,7 @@ export function useInvoiceActions() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [isCompaniesLoading, setIsCompaniesLoading] = useState<boolean>(true);
 
+  const [direction, setDirection] = useState<InvoiceDirection>('purchase');
   const [data, setData] = useState<MissingInvoicesResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'missing' | 'matched'>('missing');
   const [markedEttns, setMarkedEttns] = useState<Set<string>>(new Set());
@@ -83,28 +85,37 @@ export function useInvoiceActions() {
   }, [addToast]);
 
   const searchMissingInvoices = useCallback(
-    async (companyId: string, startDate: string, endDate: string) => {
+    async (
+      companyId: string,
+      startDate: string,
+      endDate: string,
+      targetDirection?: InvoiceDirection
+    ) => {
       if (!companyId) {
         addToast('Firma Seçilmedi', 'Lütfen işlem yapmak istediğiniz firmayı seçin.', 'error');
         return;
       }
 
+      const activeDir = targetDirection ?? direction;
+
       setIsLoading(true);
       try {
-        const result = await fetchMissingInvoices(companyId, startDate, endDate);
+        const result = await fetchMissingInvoices(companyId, startDate, endDate, activeDir);
         setData(result);
         setMarkedEttns(new Set());
+
+        const dirLabel = activeDir === 'sales' ? 'Satış (Giden)' : 'Satın Alma (Gelen)';
 
         if (result.missingInvoices.length === 0) {
           addToast(
             'Sonuç Bulundu',
-            'Seçilen tarih aralığında Logo ERP sisteminde eksik olan fatura bulunamadı. Tüm faturalar eşleşti.',
+            `Seçilen tarih aralığında Logo ERP ${dirLabel} sisteminde eksik olan fatura bulunamadı. Tüm faturalar eşleşti.`,
             'success'
           );
         } else {
           addToast(
             'Karşılaştırma Tamamlandı',
-            `${result.missingInvoices.length} adet eksik, ${result.matchedInvoices?.length || 0} adet eşleşen fatura tespit edildi.`,
+            `${dirLabel}: ${result.missingInvoices.length} adet eksik, ${result.matchedInvoices?.length || 0} adet eşleşen fatura tespit edildi.`,
             'info'
           );
         }
@@ -115,7 +126,7 @@ export function useInvoiceActions() {
         setIsLoading(false);
       }
     },
-    [addToast]
+    [addToast, direction]
   );
 
   const openPdfViewer = useCallback(
@@ -195,6 +206,8 @@ export function useInvoiceActions() {
     selectedCompanyId,
     setSelectedCompanyId,
     isCompaniesLoading,
+    direction,
+    setDirection,
     data,
     activeTab,
     setActiveTab,

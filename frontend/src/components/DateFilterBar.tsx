@@ -8,6 +8,8 @@ interface DateFilterBarProps {
   companies: CompanyItem[];
   selectedCompanyId: string;
   onCompanyChange: (companyId: string) => void;
+  direction?: 'purchase' | 'sales';
+  onDirectionChange?: (direction: 'purchase' | 'sales') => void;
   isCompaniesLoading: boolean;
   isLoading: boolean;
   onSearch: (companyId: string, startDate: string, endDate: string) => void;
@@ -17,6 +19,8 @@ export function DateFilterBar({
   companies,
   selectedCompanyId,
   onCompanyChange,
+  direction = 'purchase',
+  onDirectionChange,
   isCompaniesLoading,
   isLoading,
   onSearch,

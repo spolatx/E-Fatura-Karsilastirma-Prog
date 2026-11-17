@@ -5,6 +5,8 @@ export type InvoiceIntegrationStatus =
   | 'archived'
   | 'cancelled';
 
+export type InvoiceDirection = 'purchase' | 'sales';
+
 export interface CompanyItem {
   id: string;
   name: string;
@@ -22,12 +24,15 @@ export interface InvoiceSummary {
   currencyCode: string;
   profileId: string;
   invoiceType: string;
+  eInvoiceType?: number; // 1: e-Fatura, 2: e-Arşiv
+  direction?: InvoiceDirection;
   integrationStatus: InvoiceIntegrationStatus;
 }
 
 export interface MissingInvoicesResponse {
   startDate: string;
   endDate: string;
+  direction?: InvoiceDirection;
   totalIntegratorInvoicesCount: number;
   totalErpMatchedCount: number;
   missingInvoicesCount: number;
